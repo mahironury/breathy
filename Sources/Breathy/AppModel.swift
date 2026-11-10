@@ -45,8 +45,10 @@ final class AppModel {
     private(set) var areas = UsageProfile.load()
     /// Başka yerlerde kalmış eski Breathy kopyaları.
     private(set) var oldCopies: [OldCopy] = []
-    /// Menü çubuğu simgesi görünsün mü? (Önizleme/rapor modlarında ve başka Breathy beklenirken gizli.)
-    var showsMenuBarIcon = true
+    /// false: aynı kopyanın başka bir süreci kapanıyor mu diye bekleniyor; simge boş, panel "başlıyor".
+    /// Sadece görünümler okur. Sahne seviyesinde (App.body) değişken durum kullanılmaz: 0.2.2'de
+    /// MenuBarExtra'nın isInserted'ını buna bağlamak, panel açılınca sonsuz sahne güncellemesine yol açtı.
+    var isPrimaryInstance = true
     /// GitHub'da daha yeni bir sürüm varsa dolu.
     private(set) var update: ReleaseInfo?
     private(set) var isUpdating = false

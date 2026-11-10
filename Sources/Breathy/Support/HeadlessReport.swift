@@ -79,9 +79,79 @@ enum VerifyUpdateTool {
 }
 
 /// Geliştirici modlarından biri istendiyse başlatır ve true döner.
+/// Arayüz duman testi: uygulama normal açılır (menü çubuğu, tek Breathy kuralı, servisler), sonra
+/// Detaylar ve kullanım alanı pencereleri açılır ve 5 sn boyunca boşta ne kadar işlemci yakıldığı ölçülür.
+/// Menü çubuğuna tıklayamayan otomasyon için: 0.2.2'deki sahne döngüsü pencere öne gelince başlıyordu.
+///   open -n Breathy.app --args --ui-smoke <çıktı.json>
+@MainActor
+enum UISmokeTest {
+    static var outputPath: URL? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "--ui-smoke"), i + 1 < args.count else { return nil }
+        return URL(fileURLWithPath: args[i + 1])
+    }
+
+    static func cpuSeconds() -> Double {
+        var usage = rusage()
+        getrusage(RUSAGE_SELF, &usage)
+        func seconds(_ t: timeval) -> Double { Double(t.tv_sec) + Double(t.tv_usec) / 1_000_000 }
+        return seconds(usage.ru_utime) + seconds(usage.ru_stime)
+    }
+
+    static func residentMB() -> Double {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Double(info.resident_size) / 1_000_000 : -1
+    }
+
+    /// Menü çubuğundaki kendi düğmemiz (MenuBarExtra'nın durum çubuğu penceresindeki NSStatusBarButton).
+    static func statusButton() -> NSButton? {
+        func find(_ view: NSView) -> NSButton? {
+            if let button = view as? NSButton, String(describing: type(of: button)).contains("StatusBar") { return button }
+            for sub in view.subviews { if let found = find(sub) { return found } }
+            return nil
+        }
+        for window in NSApp.windows where String(describing: type(of: window)).contains("StatusBar") {
+            if let content = window.contentView, let button = find(content) { return button }
+        }
+        return nil
+    }
+
+    static func schedule(model: AppModel, out: URL) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            let button = statusButton()
+            button?.performClick(nil)  // menü çubuğu panelini aç (kullanıcının tıklaması gibi)
+            try? await Task.sleep(for: .seconds(1))
+            let cpu0 = cpuSeconds(), mem0 = residentMB(), t0 = Date()
+            try? await Task.sleep(for: .seconds(5))
+            let report: [String: Double] = [
+                "panelOpened": button == nil ? 0 : 1,
+                "idleCPUSeconds": cpuSeconds() - cpu0,
+                "wallSeconds": Date().timeIntervalSince(t0),
+                "memoryStartMB": mem0,
+                "memoryEndMB": residentMB(),
+            ]
+            let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            try? data?.write(to: out)
+            NSApp.terminate(nil)
+        }
+    }
+}
+
 @MainActor
 enum DevTools {
     static func run(model: AppModel) -> Bool {
+        // Duman testi uygulamayı normal açar (false döner), sadece ölçümü zamanlar.
+        if let out = UISmokeTest.outputPath {
+            UISmokeTest.schedule(model: model, out: out)
+            return false
+        }
         if let out = HeadlessReport.outputPath {
             HeadlessReport.run(into: out)
             return true

@@ -5,6 +5,16 @@ struct MenuPanel: View {
     let model: AppModel
 
     var body: some View {
+        if model.isPrimaryInstance {
+            content
+        } else {
+            Text("Breathy başlıyor…")
+                .padding(16)
+                .frame(width: 320)
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
 

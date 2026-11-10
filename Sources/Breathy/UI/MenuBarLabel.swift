@@ -6,9 +6,14 @@ struct MenuBarLabel: View {
     let model: AppModel
 
     var body: some View {
-        let free = model.disk.map { ByteFormat.string($0.available) }
-        Image(nsImage: MenuBarIcon.image(freeText: free))
-            .accessibilityLabel(free.map { "Breathy, \($0) boş" } ?? "Breathy")
+        if model.isPrimaryInstance {
+            let free = model.disk.map { ByteFormat.string($0.available) }
+            Image(nsImage: MenuBarIcon.image(freeText: free))
+                .accessibilityLabel(free.map { "Breathy, \($0) boş" } ?? "Breathy")
+        } else {
+            // Başka bir Breathy'nin kapanması bekleniyor (en çok 3 sn): yer kaplamayan boş simge.
+            Image(nsImage: NSImage(size: NSSize(width: 1, height: 1)))
+        }
     }
 }
 
