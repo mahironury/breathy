@@ -62,6 +62,10 @@ enum DebugSnapshot {
                               to: out.appending(path: "gercek-detaylar-\(name).png"))
             }
             await capture(UsageProfileView(model: model), size: nil, to: out.appending(path: "gercek-profil.png"))
+            // En dar pencere: temizlik çubuğundaki düğmeler sığıyor mu?
+            model.detailsCategory = .duplicates
+            await capture(DetailsView(model: model), size: NSSize(width: 800, height: 480),
+                          to: out.appending(path: "gercek-detaylar-cift-dar.png"))
             NSApp.terminate(nil)
         }
     }

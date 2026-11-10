@@ -1,10 +1,24 @@
 import SwiftUI
 
-/// Alt çubuk: seçim özeti + "Seçilenleri temizle"; temizlik sürerken ilerleme; bitince rapor.
+/// Alt çubuk: seçim özeti + temizlik düğmeleri; temizlik sürerken ilerleme; bitince rapor.
+/// Seçim bütün kategorileri kapsar; "Sadece bu kategori" yalnızca açık kategoridekileri temizler.
 struct CleanBar: View {
     let model: AppModel
-    @State private var confirmingClean = false
+    /// Detaylar'da açık olan kategori.
+    var category: ScanCategory? = nil
+    /// Doluysa onay penceresi açık: neyin temizleneceği.
+    @State private var scope: CleanScope?
     @State private var confirmingTrash = false
+
+    enum CleanScope: Equatable {
+        case all
+        case only(ScanCategory)
+
+        var category: ScanCategory? {
+            if case .only(let category) = self { return category }
+            return nil
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -25,11 +39,16 @@ struct CleanBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.bar)
-        .confirmationDialog("Seçilenleri temizle", isPresented: $confirmingClean, titleVisibility: .visible) {
-            Button("Temizle", role: .destructive) { model.cleanSelected() }
+        .confirmationDialog(
+            scope.flatMap(\.category).map { "\($0.title): seçilenleri temizle" } ?? "Seçilenleri temizle",
+            isPresented: Binding(get: { scope != nil }, set: { if !$0 { scope = nil } }),
+            titleVisibility: .visible,
+            presenting: scope
+        ) { scope in
+            Button("Temizle", role: .destructive) { model.cleanSelected(in: scope.category) }
             Button("Vazgeç", role: .cancel) {}
-        } message: {
-            Text(confirmationText)
+        } message: { scope in
+            Text(confirmationText(scope))
         }
         .confirmationDialog("Çöp'ü boşalt", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Boşalt", role: .destructive) { model.emptyTrash() }
@@ -41,26 +60,28 @@ struct CleanBar: View {
 
     // MARK: - Seçim
 
-    private var split: (deleteCount: Int, deleteBytes: Int64, trashCount: Int, trashBytes: Int64) {
-        let selected = model.selectedFindings
+    private func split(_ scope: CleanScope = .all) -> (deleteCount: Int, deleteBytes: Int64, trashCount: Int, trashBytes: Int64) {
+        let selected = model.selectedFindings(in: scope.category)
         let delete = selected.filter { $0.risk == .safe }
         let trash = selected.filter { $0.risk == .review }
         return (delete.count, delete.reduce(0) { $0 + $1.bytes }, trash.count, trash.reduce(0) { $0 + $1.bytes })
     }
 
     private var selectionView: some View {
-        let s = split
+        let s = split()
         let total = s.deleteBytes + s.trashBytes
+        let here = category.map { model.selectedBytes(in: $0) } ?? 0
+        // Seçim açık kategorinin dışına da taşıyor mu? O zaman iki düğme, adları da kapsamı söylesin.
+        let spansOthers = here < total
         return Group {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Seçili: \(s.deleteCount + s.trashCount) öğe · \(ByteFormat.string(total))")
                     .font(.headline)
                     .monospacedDigit()
-                HStack(spacing: 12) {
-                    Label("\(ByteFormat.string(s.deleteBytes)) doğrudan silinecek", systemImage: "circle.fill")
-                        .foregroundStyle(.green)
-                    Label("\(ByteFormat.string(s.trashBytes)) Çöp'e gidecek", systemImage: "circle.fill")
-                        .foregroundStyle(.orange)
+                // Dar pencerede yan yana sığmazsa alt alta (satır ortasından bölünmesin).
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { splitLabels(s) }
+                    VStack(alignment: .leading, spacing: 1) { splitLabels(s) }
                 }
                 .labelStyle(DotLabelStyle())
                 .font(.caption)
@@ -68,11 +89,17 @@ struct CleanBar: View {
             Spacer()
             Button("Önerilenlere dön") { model.resetSelection() }
                 .help("Seçimi Breathy'nin önerdiklerine geri al")
-            Button {
-                confirmingClean = true
-            } label: {
-                Label("Seçilenleri temizle", systemImage: "sparkles")
+            if let category, here > 0, spansOthers {
+                Button("Sadece bu kategori · \(ByteFormat.string(here))") { scope = .only(category) }
+                    .controlSize(.large)
+                    .help("Sadece \(category.title) içindeki seçilenleri temizle; diğer kategorilerdeki seçimin kalır")
             }
+            Button {
+                scope = .all
+            } label: {
+                Label(spansOthers && here > 0 ? "Tüm seçilenleri temizle" : "Seçilenleri temizle", systemImage: "sparkles")
+            }
+            .help("Bütün kategorilerde seçili olanları temizler")
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(total == 0 || model.isScanning)
@@ -80,9 +107,26 @@ struct CleanBar: View {
         }
     }
 
-    private var confirmationText: String {
-        let s = split
+    @ViewBuilder
+    private func splitLabels(_ s: (deleteCount: Int, deleteBytes: Int64, trashCount: Int, trashBytes: Int64)) -> some View {
+        Label("\(ByteFormat.string(s.deleteBytes)) doğrudan silinecek", systemImage: "circle.fill")
+            .foregroundStyle(.green)
+            .fixedSize()
+        Label("\(ByteFormat.string(s.trashBytes)) Çöp'e gidecek", systemImage: "circle.fill")
+            .foregroundStyle(.orange)
+            .fixedSize()
+    }
+
+    private func confirmationText(_ scope: CleanScope) -> String {
+        let s = split(scope)
         var lines: [String] = []
+        switch scope {
+        case .only(let category):
+            lines.append("Sadece \"\(category.title)\" temizlenecek. Diğer kategorilerdeki seçimin olduğu gibi kalır.")
+        case .all:
+            let count = Set(model.selectedFindings.map(\.category)).count
+            if count > 1 { lines.append("\(count) kategorideki bütün seçilenler temizlenecek.") }
+        }
         if s.deleteCount > 0 {
             lines.append("\(s.deleteCount) öğe (\(ByteFormat.string(s.deleteBytes))) kalıcı olarak silinecek. Bunlar önbellek, log, node_modules gibi kendiliğinden yeniden oluşan dosyalar.")
         }

@@ -30,7 +30,7 @@ struct DetailsView: View {
                         }
                     }
                     Divider()
-                    CleanBar(model: model)
+                    CleanBar(model: model, category: category)
                 }
             } else {
                 ContentUnavailableView {

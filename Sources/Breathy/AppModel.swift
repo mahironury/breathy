@@ -421,6 +421,11 @@ extension AppModel {
         lastScan?.findings.filter { selection.contains($0.path) && Self.isSelectable($0) } ?? []
     }
 
+    /// Seçilenler; kategori verilirse sadece o kategoridekiler.
+    func selectedFindings(in category: ScanCategory?) -> [Finding] {
+        selectedFindings.filter { category == nil || $0.category == category }
+    }
+
     func selectedBytes(in category: ScanCategory? = nil) -> Int64 {
         selectedFindings
             .filter { category == nil || $0.category == category }
@@ -447,8 +452,9 @@ extension AppModel {
     }
 
     /// Seçilenleri türüne göre temizler (🟢 sil, 🟡 Çöp'e taşı). Arka planda, iptal edilebilir.
-    func cleanSelected() {
-        clean(selectedFindings)
+    /// Kategori verilirse sadece o kategorideki seçilenler; diğer kategorilerdeki seçim olduğu gibi kalır.
+    func cleanSelected(in category: ScanCategory? = nil) {
+        clean(selectedFindings(in: category))
     }
 
     private func clean(_ selected: [Finding]) {
