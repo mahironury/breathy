@@ -15,7 +15,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
     case oldInstallers, largeFiles, unusedApps, appLeftovers
     case screenCaptures, duplicates
     case appData, iosBackups, docker, photosLibrary, iCloudArchive
-    case hiddenFolders
+    case hiddenFolders, devTools
 
     var title: String {
         switch self {
@@ -39,6 +39,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .docker: "Docker disk görüntüsü"
         case .photosLibrary: "Fotoğraflar kütüphanesi"
         case .hiddenFolders: "Büyük gizli klasörler"
+        case .devTools: "Geliştirici araçlarının kayıtları"
         }
     }
 
@@ -51,6 +52,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .photosLibrary: "Fotoğraflar"
         case .iCloudArchive: "iCloud arşivi"
         case .hiddenFolders: "Gizli klasörler"
+        case .devTools: "Geliştirici araçları"
         default: title
         }
     }
@@ -77,6 +79,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .docker: "shippingbox.circle"
         case .photosLibrary: "photo.on.rectangle"
         case .hiddenFolders: "questionmark.folder"
+        case .devTools: "wrench.and.screwdriver"
         }
     }
 }

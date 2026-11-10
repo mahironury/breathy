@@ -5,6 +5,7 @@ Mac'ine nefes aldıran, menü çubuğunda yaşayan hafif bir disk temizleyici.
 - Menü çubuğunda boş alanı gösterir; panelde doluluk yüzdesi, tek dokunuşla Çöp'ü boşaltma ve tarama.
 - Önbellekleri, logları, eski `node_modules` ve derleme çıktılarını, eski kurulum dosyalarını, büyük ve çift dosyaları, kaldırılmış uygulamaların artıklarını bulur.
 - Büyük gizli klasörleri (`~/.gemini`, `~/.colima`…) gösterir; aylardır dokunulmamış eski kopyaları ayrıca belirtir.
+- Geliştirici araçlarının (VS Code, Cursor, Antigravity, Windsurf) yeniden oluşan önbelleklerini ve eski ekran kayıtlarını bulur. Sohbet geçmişine, planlara ve dosyaların yerel geçmişine dokunmaz.
 - Fotoğraf/video için Lightroom önizlemelerini ve Final Cut Pro render dosyalarını, iPhone/iPad için eski güncelleme dosyalarını bulur.
 - Geçen taramadan beri en çok büyüyen klasörleri gösterir.
 - Türe göre temizler: kendiliğinden yeniden oluşanlar (önbellek, log, `node_modules`) doğrudan silinir; kişisel dosyalar Çöp'e gider. Panelden tek tıkla sadece güvenli olanlar temizlenir.

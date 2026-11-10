@@ -24,6 +24,25 @@ extension Scanner {
                 guard let latest = ctx.latestChange[sub], daysSince(latest) >= limits.staleProjectDays else { continue }
                 let months = Int(daysSince(latest) / 30)
                 let url = env.home.appending(path: sub, directoryHint: .isDirectory)
+
+                // Bilinen bir aracın verisi (ör. Antigravity'nin eski IDE klasörü): içinde proje geçmişi
+                // olabilir. "Eski kopya" diye seçtirilmez; eski kayıtları devToolData ayrıca listeler.
+                if let known = Self.devTool(containing: sub) {
+                    guard known.root == sub else { continue }  // aracın iç düzenini kurallar biliyor
+                    let present = known.tool.history.filter {
+                        FileManager.default.fileExists(atPath: url.appending(path: $0).path)
+                    }
+                    if !present.isEmpty {
+                        let note = "\(known.tool.name) verisi — başka bir arayüzün ya da eski bir kopyanın klasörü, "
+                            + "\(months) aydır değişmemiş. İçinde proje geçmişi var (\(present.joined(separator: ", "))); "
+                            + "Breathy bunu silmez. Yer kaplayan eski kayıtlar 'Geliştirici araçlarının kayıtları'nda."
+                        if let f = makeFinding(url, .hiddenFolders, .info, bytes: subBytes, lastUsed: latest,
+                                               note: note, ctx: ctx) {
+                            out.append(f)
+                        }
+                        continue
+                    }
+                }
                 if let f = makeFinding(url, .hiddenFolders, .review, bytes: subBytes, suggested: false, lastUsed: latest,
                                        note: "\(months) aydır hiçbir dosyası değişmemiş — eski bir kopya olabilir. "
                                            + "Kullanmadığından eminsen seç; Çöp'e taşınır.",
@@ -38,7 +57,7 @@ extension Scanner {
     /// Hangi uygulamanın verisi olduğunu söyleyen kısa not.
     static func hiddenFolderNote(_ key: String) -> String {
         let notes: [String: String] = [
-            ".gemini": "Gemini CLI ve Antigravity verisi (tarayıcı kayıtları, sohbetler)",
+            ".gemini": "Gemini CLI ve Antigravity verisi. Sohbet geçmişine ve planlara Breathy dokunmaz; eski tarayıcı kayıtları 'Geliştirici araçlarının kayıtları'nda",
             ".antigravity": "Antigravity eklentileri",
             ".colima": "Colima sanal makinesi — 'colima delete' ile kaldırılır",
             ".docker": "Docker ayarları ve verisi",
@@ -54,7 +73,7 @@ extension Scanner {
             ".gradle": "Gradle verisi",
             ".android": "Android emülatörleri ve SDK verisi",
             ".bun": "Bun verisi",
-            ".claude": "Claude Code verisi",
+            ".claude": "Claude Code verisi (oturum geçmişi ve hafıza) — Breathy dokunmaz",
             ".local": "Komut satırı araçlarının verisi",
             ".config": "Uygulama ayarları",
         ]
@@ -71,6 +90,6 @@ extension Scanner {
         guard path.hasPrefix(home + "/") else { return nil }
         let top = path.dropFirst(home.count + 1).split(separator: "/").first.map(String.init) ?? ""
         guard let needle = owners[top] else { return nil }
-        return runningApps.first { $0.key.contains(needle) }?.value
+        return runningApp(matching: [needle], in: runningApps)
     }
 }

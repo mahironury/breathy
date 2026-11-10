@@ -99,6 +99,8 @@ struct FindingList: View {
         case .largeFiles: text += " 6 aydır açılmayanlar işaretlendi."
         case .screenCaptures: text += " 30 günden eskiler işaretlendi."
         case .nodeModules, .buildOutputs, .pythonEnvs: text += " Sadece 90 gündür dokunulmamış projeler."
+        case .devTools:
+            text = "Kodlama ve yapay zekâ araçlarının (VS Code, Cursor, Antigravity…) yeniden oluşan önbellekleri ve eski ekran kayıtları. Sohbet geçmişi, planlar ve dosyaların yerel geçmişi asla önerilmez. Araç açıksa önce kapat."
         case .hiddenFolders:
             text = "Gizli klasörler uygulamaların verisidir; klasörün kendisi sadece bilgi. İçinde 3 aydır hiçbir dosyası değişmemiş büyük alt klasörler (ör. eski kopyalar) seçilebilir, hiçbiri otomatik işaretlenmez. Seçersen Çöp'e taşınır; önce ilgili uygulamayı kapat."
         case .unusedApps: text += " 6 aydır açılmamış uygulamalar."

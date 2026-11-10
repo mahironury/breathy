@@ -58,6 +58,9 @@ struct Scanner: Sendable {
         try ctx.phase("Uygulama verileri")
         findings += try libraryAppData(ctx)
 
+        try ctx.phase("Geliştirici araçları")
+        findings += try devToolData(ctx)
+
         try ctx.phase("Uygulamalar")
         findings += try unusedApps(ctx)
 
