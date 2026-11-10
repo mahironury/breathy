@@ -34,11 +34,14 @@ enum SystemLinks {
         NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
 
-    /// İzin verildikten sonra macOS bazen uygulamanın yeniden açılmasını ister.
+    /// Yeniden başlat (izin verildikten sonra ya da güncellemeden sonra). Yeni açılan kopya
+    /// `--replace-running` ile başlar: tek Breathy kuralı onu tutar, bu süreci kapatır
+    /// (bu süreç kendiliğinden kapanmazsa zorla).
     @MainActor
     static func relaunch() {
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
+        config.arguments = [SingleInstance.replaceFlag]
         // Tamamlanma arka plan kuyruğunda çağrılır; @Sendable olmazsa ana aktör denetimi çökertir.
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { @Sendable _, _ in
             Task { @MainActor in NSApp.terminate(nil) }

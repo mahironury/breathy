@@ -47,6 +47,10 @@ struct MenuPanel: View {
                     .transition(.opacity)
             }
 
+            ForEach(model.oldCopies) { copy in
+                OldCopyRow(copy: copy) { model.trashOldCopy(copy) }
+            }
+
             if let update = model.update {
                 UpdateRow(version: update.version, isUpdating: model.isUpdating,
                           install: { model.installUpdate() },
@@ -145,5 +149,39 @@ struct UpdateRow: View {
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.08)))
+    }
+}
+
+/// Başka bir yerde eski Breathy kopyası varsa: "Eski Breathy kopyası (0.2.0) · Çöp'e taşı".
+struct OldCopyRow: View {
+    let copy: OldCopy
+    let trash: () -> Void
+
+    private var shortPath: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let folder = (copy.path as NSString).deletingLastPathComponent
+        return folder.hasPrefix(home) ? "~" + folder.dropFirst(home.count) : folder
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "square.on.square.dashed")
+                .font(.title3)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Eski Breathy kopyası").fontWeight(.medium).lineLimit(1)
+                Text("\(copy.version) · \(shortPath)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button("Çöp'e taşı", action: trash)
+                .controlSize(.small)
+                .help("Bu kopya çalışıyorsa önce kapatılır, sonra Çöp'e taşınır")
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.orange.opacity(0.08)))
     }
 }

@@ -43,6 +43,8 @@ final class AppModel {
     private(set) var ignored = IgnoreList.load()
     /// Kullanıcının seçtiği kullanım alanları (ilk açılışta sorulur).
     private(set) var areas = UsageProfile.load()
+    /// Başka yerlerde kalmış eski Breathy kopyaları.
+    private(set) var oldCopies: [OldCopy] = []
     /// GitHub'da daha yeni bir sürüm varsa dolu.
     private(set) var update: ReleaseInfo?
     private(set) var isUpdating = false
@@ -99,12 +101,49 @@ final class AppModel {
         notifier.onOpen = { [weak self] in self?.openDetails() }
         lowSpace = notifier
         if let disk { notifier.check(disk) }
+
+        // Güncellemeden sonraki ilk açılış: haber ver.
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: "lastRunVersion")
+        // 0.2.1 ve öncesi bu kaydı tutmuyordu: o zaman "eskisinin yerini al" ile açılmış olmak yeterli.
+        if previous.map({ $0 != Updater.currentVersion }) ?? SingleInstance.isReplacing {
+            notifier.notifyUpdated(from: previous, to: Updater.currentVersion)
+            show("✓ Breathy \(Updater.currentVersion) sürümüne güncellendi.")
+        }
+        defaults.set(Updater.currentVersion, forKey: "lastRunVersion")
+        oldCopies = OldCopies.find()
         // İlk açılışta: "Bu Mac'i ne için kullanıyorsun?"
         if !UsageProfile.wasAsked() {
             Task {
                 try? await Task.sleep(for: .seconds(1))
                 showUsageProfile()
             }
+        }
+    }
+
+    // MARK: - Eski kopyalar
+
+    /// Geliştirme önizlemesi.
+    func showOldCopiesForPreview(_ copies: [OldCopy]) {
+        oldCopies = copies
+    }
+
+    /// Eski Breathy kopyasını Çöp'e taşır; o kopya hâlâ çalışıyorsa önce kapatır.
+    func trashOldCopy(_ copy: OldCopy) {
+        let id = Bundle.main.bundleIdentifier ?? "com.breathy.app"
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            .filter { $0.bundleURL?.resolvingSymlinksInPath().path == copy.path }
+        SingleInstance.terminate(running.map(\.processIdentifier))
+        Task {
+            if !running.isEmpty { try? await Task.sleep(for: .seconds(1)) }
+            do {
+                try FileManager.default.trashItem(at: URL(fileURLWithPath: copy.path), resultingItemURL: nil)
+                show("✓ Eski Breathy (\(copy.version)) Çöp'e taşındı.")
+            } catch {
+                show("Eski kopya taşınamadı. Finder'da kendin Çöp'e atabilirsin.")
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: copy.path)])
+            }
+            oldCopies = OldCopies.find()
         }
     }
 
@@ -144,7 +183,10 @@ final class AppModel {
         refreshTrash()
         iCloud = ICloudStatus.read()
         screenshotFolder = ScreenshotSettings.location()
-        if lowSpace != nil { loginItem = LoginItem.state }
+        if lowSpace != nil {
+            loginItem = LoginItem.state
+            oldCopies = OldCopies.find()
+        }
     }
 
     func setLaunchAtLogin(_ on: Bool) {

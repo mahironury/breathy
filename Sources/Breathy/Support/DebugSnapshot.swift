@@ -24,6 +24,10 @@ enum DebugSnapshot {
            var scan = try? JSONDecoder().decode(ScanResult.self, from: data) {
             if args.contains("--demo") {  // yeni panel parçalarını görmek için örnek veri
                 model.showAreasForPreview([.development, .aiCoding, .media])
+                if args.contains("--demo-old-copy") {
+                    let home = FileManager.default.homeDirectoryForCurrentUser.path
+                    model.showOldCopiesForPreview([OldCopy(path: home + "/Downloads/Breathy/Breathy.app", version: "0.2.0")])
+                }
                 scan.growthSince = scan.date.addingTimeInterval(-3 * 86_400)
                 scan.growth = [
                     GrowthItem(key: "Library/Group Containers/group.net.whatsapp.WhatsApp.shared",

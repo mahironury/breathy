@@ -19,6 +19,16 @@ struct BreathyApp: App {
             return
         }
         #endif
+        // Aynı anda tek Breathy: başka biri kalıyorsa bu süreç simge koymadan kapanır
+        // (eskileri kapatıyorsa, zorla kapatma süresi dolana kadar bekleyip).
+        if let delay = SingleInstance.resolve() {
+            showsMenuBarIcon = false
+            Task { @MainActor in
+                try? await Task.sleep(for: delay)
+                NSApp.terminate(nil)
+            }
+            return
+        }
         showsMenuBarIcon = true
         model.startBackgroundServices()  // açılışta başlatma + 10 GB uyarısı
     }

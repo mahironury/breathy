@@ -63,6 +63,15 @@ final class LowSpaceNotifier: NSObject, UNUserNotificationCenterDelegate {
         center.add(UNNotificationRequest(identifier: Self.requestID, content: content, trigger: nil))
     }
 
+    /// Sürüm değiştiyse (güncellemeden sonraki ilk açılış) tek bir bildirim.
+    func notifyUpdated(from old: String?, to new: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Breathy güncellendi"
+        content.body = old.map { "Sürüm \(new) çalışıyor (önceki: \($0)). Eski sürüm kapatıldı." }
+            ?? "Sürüm \(new) çalışıyor. Eski sürüm kapatıldı."
+        center.add(UNNotificationRequest(identifier: "breathy.updated", content: content, trigger: nil))
+    }
+
     // Breathy menü çubuğu uygulaması olduğu için hep "ön planda" sayılır; bildirimi yine de göster.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
