@@ -1,0 +1,31 @@
+Breathy — başka bir Mac'e kurulum
+=================================
+
+Gereken: macOS 14 (Sonoma) ya da daha yenisi. Apple Silicon ve Intel Mac'lerde çalışır.
+
+1) Breathy.app'i Uygulamalar (Applications) klasörüne sürükle.
+   (Açılışta kendiliğinden başlaması için Uygulamalar klasöründe olmalı.)
+
+2) Breathy.app'e çift tıkla.
+   macOS "Apple, Breathy'yi doğrulayamadı" derse bu normal: uygulama App Store'dan
+   değil, senin kendi sertifikanla imzalı.
+     • Tamam'a bas.
+     • Sistem Ayarları → Gizlilik ve Güvenlik → en altta "Breathy engellendi"
+       satırındaki "Yine de Aç" düğmesine bas, şifreni gir.
+   Bu sadece ilk açılışta bir kez gerekir.
+
+3) Sağ üstteki rüzgâr simgesine bas. "Çöp'ü görebilmem için izin gerekiyor" kutusunda
+   "Ayarları Aç"a bas ve Tam Disk Erişimi listesinde Breathy'yi aç.
+   Sonra paneldeki "Yeniden başlat"a bas.
+   (İzin olmadan Breathy hiçbir klasörü taramaz.)
+
+4) Bildirim izni sorulursa "İzin Ver"e bas. Boş alan 10 GB'ın altına inince
+   tek bir uyarı gönderir.
+
+Güncelleme: 0.2'den itibaren Breathy günde bir kez yeni sürüm olup olmadığına bakar.
+Varsa panelde "Güncelle" düğmesi çıkar; basınca kendini günceller ve yeniden açılır.
+Aynı sertifikayla imzalı olduğu için Tam Disk Erişimi izni korunur. Elle denetlemek
+için paneldeki sürüm numarasına tıkla.
+
+Kaldırma: menüden "Çık", sonra Breathy.app'i Çöp'e at. Kayıtlı tarama sonucu
+~/Library/Application Support/Breathy klasöründedir.

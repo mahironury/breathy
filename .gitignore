@@ -1,0 +1,18 @@
+# Derleme çıktıları
+.build/
+build/
+dist/
+.swiftpm/
+.DS_Store
+
+# Sadece geliştirici Mac'inde duranlar (GitHub'a gönderilmez)
+PLAN.md
+Tests/
+.githooks/
+.claude/
+scripts/package.sh
+scripts/release.sh
+scripts/version-guard.sh
+scripts/setup-hooks.sh
+scripts/make-icon.sh
+scripts/make-icon.swift
