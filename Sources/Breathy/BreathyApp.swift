@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Breathy — menü çubuğunda yaşayan disk ferahlatıcı.
@@ -6,8 +7,6 @@ import SwiftUI
 @main
 struct BreathyApp: App {
     @State private var model: AppModel
-    /// Rapor/önizleme modlarında menü çubuğuna simge konmaz.
-    private let showsMenuBarIcon: Bool
 
     init() {
         let model = AppModel()
@@ -15,26 +14,36 @@ struct BreathyApp: App {
         #if BREATHY_DEV_TOOLS
         // Sadece geliştirme derlemesinde: --report / --snapshot / --verify-update.
         if DevTools.run(model: model) {
-            showsMenuBarIcon = false
+            model.showsMenuBarIcon = false
             return
         }
         #endif
-        // Aynı anda tek Breathy: başka biri kalıyorsa bu süreç simge koymadan kapanır
-        // (eskileri kapatıyorsa, zorla kapatma süresi dolana kadar bekleyip).
-        if let delay = SingleInstance.resolve() {
-            showsMenuBarIcon = false
+        // Aynı anda tek Breathy (bkz. SingleInstance).
+        switch SingleInstance.resolve() {
+        case .run:
+            model.startBackgroundServices()  // açılışta başlatma + 10 GB uyarısı
+        case .quit(let delay):
+            model.showsMenuBarIcon = false
             Task { @MainActor in
                 try? await Task.sleep(for: delay)
                 NSApp.terminate(nil)
             }
-            return
+        case .waitFor(let keepers):
+            // Aynı kopyanın eski süreci kapanmak üzere olabilir (eski sürümün güncellemesi): bekle.
+            model.showsMenuBarIcon = false
+            Task { @MainActor in
+                if await SingleInstance.waitUntilGone(keepers) {
+                    model.showsMenuBarIcon = true
+                    model.startBackgroundServices()
+                } else {
+                    NSApp.terminate(nil)
+                }
+            }
         }
-        showsMenuBarIcon = true
-        model.startBackgroundServices()  // açılışta başlatma + 10 GB uyarısı
     }
 
     var body: some Scene {
-        MenuBarExtra(isInserted: .constant(showsMenuBarIcon)) {
+        MenuBarExtra(isInserted: Binding(get: { model.showsMenuBarIcon }, set: { model.showsMenuBarIcon = $0 })) {
             MenuPanel(model: model)
         } label: {
             MenuBarLabel(model: model)

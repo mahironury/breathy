@@ -13,66 +13,115 @@ enum SingleInstance {
         let bundlePath: String?
         /// Klasördeki Info.plist'e göre sürüm; okunamazsa nil.
         let version: String?
+        /// Süreç, diskteki uygulama dosyası yazılmadan önce başlamış: eski kodla çalışıyor
+        /// (klasör güncellenmiş ama süreç kapanmamış).
+        var startedBeforeCurrentBuild = false
     }
 
     enum Decision: Equatable {
         case keepRunning
         case terminate([pid_t])
-        /// Başka bir Breathy kalıyor; bu süreç çıkar, ama önce eskileri kapatır.
+        /// Aynı kopyanın başka bir süreci açık. Ya iki kez açıldı ya da eski sürümün güncelleyicisi bizi
+        /// açıp kendisi kapanmak üzere (0.2.1 ve öncesi `--replace-running` göndermez). Biraz bekle:
+        /// kapanırsa devam et, kapanmazsa çık. Eskileri her durumda kapat.
+        case waitThenDecide(keepers: [pid_t], terminating: [pid_t])
+        /// Başka yerde aynı ya da daha yeni sürüm açık: bu süreç çıkar, ama önce eskileri kapatır.
         case quitSelf(terminating: [pid_t])
+    }
+
+    /// Açılışta yapılacak iş.
+    enum Action: Equatable {
+        case run
+        case quit(after: Duration)
+        case waitFor([pid_t])
     }
 
     static func decide(myPath: String, myVersion: String, others: [RunningCopy], replacing: Bool) -> Decision {
         guard !others.isEmpty else { return .keepRunning }
         if replacing { return .terminate(others.map(\.pid)) }
         var stale: [pid_t] = []
-        var keeperExists = false
+        var samePath: [pid_t] = []
+        var keeperElsewhere = false
         for other in others {
             guard let path = other.bundlePath, let version = other.version else {
                 stale.append(other.pid)  // klasörü silinmiş: eski, kapatılmalı
                 continue
             }
-            if path == myPath || !Updater.isNewer(myVersion, than: version) {
-                keeperExists = true  // aynı kopya ya da aynı/daha yeni sürüm zaten açık
+            if path == myPath {
+                if other.startedBeforeCurrentBuild {
+                    stale.append(other.pid)  // klasör güncellenmiş, süreç eski kodla kalmış
+                } else {
+                    samePath.append(other.pid)  // aynı kopya ikinci kez açılmış olabilir
+                }
+            } else if !Updater.isNewer(myVersion, than: version) {
+                keeperElsewhere = true  // başka yerde aynı ya da daha yeni sürüm açık
             } else {
                 stale.append(other.pid)  // başka yerdeki daha eski sürüm
             }
         }
-        if keeperExists { return .quitSelf(terminating: stale) }
+        if keeperElsewhere { return .quitSelf(terminating: stale) }
+        if !samePath.isEmpty { return .waitThenDecide(keepers: samePath, terminating: stale) }
         return stale.isEmpty ? .keepRunning : .terminate(stale)
     }
 
-    /// Açılışta çağrılır. Dönen süre doluysa bu süreç o kadar bekleyip kapanmalı (başka bir Breathy
-    /// kalıyor; bekleme, kapatılan eskiler zorla kapatılabilsin diye).
+    /// Açılışta çağrılır ve ne yapılacağını söyler.
     @MainActor
-    static func resolve() -> Duration? {
+    static func resolve() -> Action {
         let me = ProcessInfo.processInfo.processIdentifier
         let id = Bundle.main.bundleIdentifier ?? "com.breathy.app"
+        let myPath = Bundle.main.bundleURL.resolvingSymlinksInPath().path
+        // Diskteki çalıştırılabilir dosyanın yazılma zamanı (paket açılırken korunur: derleme zamanı).
+        let currentBuild = Bundle.main.executableURL
+            .flatMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: id)
             .filter { $0.processIdentifier != me && !$0.isTerminated }
             .map { app in
                 let path = app.bundleURL.map { $0.resolvingSymlinksInPath().path }
                 let exists = path.map { FileManager.default.fileExists(atPath: $0) } ?? false
+                let olderCode = path == myPath && {
+                    guard let launched = app.launchDate, let currentBuild else { return false }
+                    return launched < currentBuild.addingTimeInterval(-1)
+                }()
                 return RunningCopy(pid: app.processIdentifier,
                                    bundlePath: exists ? path : nil,
-                                   version: exists ? path.flatMap(version(atBundlePath:)) : nil)
+                                   version: exists ? path.flatMap(version(atBundlePath:)) : nil,
+                                   startedBeforeCurrentBuild: olderCode)
             }
         let decision = decide(
-            myPath: Bundle.main.bundleURL.resolvingSymlinksInPath().path,
+            myPath: myPath,
             myVersion: Updater.currentVersion,
             others: others,
             replacing: ProcessInfo.processInfo.arguments.contains(replaceFlag)
         )
         switch decision {
         case .keepRunning:
-            return nil
+            return .run
         case .terminate(let pids):
             terminate(pids)
-            return nil
+            return .run
+        case .waitThenDecide(let keepers, let pids):
+            terminate(pids)
+            return .waitFor(keepers)
         case .quitSelf(let pids):
             terminate(pids)
-            return pids.isEmpty ? .zero : .seconds(4)
+            // Eskiler zorla kapatılabilsin diye biraz bekleyip çık.
+            return .quit(after: pids.isEmpty ? .zero : .seconds(4))
         }
+    }
+
+    /// Verilen süreçlerin hepsi kapanana kadar (en çok `timeout`) bekler; kapandılarsa true.
+    @MainActor
+    static func waitUntilGone(_ pids: [pid_t], timeout: Duration = .seconds(3)) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            let alive = pids.contains { pid in
+                guard let app = NSRunningApplication(processIdentifier: pid) else { return false }
+                return !app.isTerminated
+            }
+            if !alive { return true }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return false
     }
 
     /// Bu süreç başka bir Breathy'nin yerini almak için mi açıldı?

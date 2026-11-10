@@ -45,6 +45,8 @@ final class AppModel {
     private(set) var areas = UsageProfile.load()
     /// Başka yerlerde kalmış eski Breathy kopyaları.
     private(set) var oldCopies: [OldCopy] = []
+    /// Menü çubuğu simgesi görünsün mü? (Önizleme/rapor modlarında ve başka Breathy beklenirken gizli.)
+    var showsMenuBarIcon = true
     /// GitHub'da daha yeni bir sürüm varsa dolu.
     private(set) var update: ReleaseInfo?
     private(set) var isUpdating = false
