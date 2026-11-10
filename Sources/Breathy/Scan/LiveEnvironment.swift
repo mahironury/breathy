@@ -16,7 +16,7 @@ enum RunningApps {
 extension ScanEnvironment {
     /// Gerçek Mac için ortam. Açık uygulamaların listesi tarama başlarken alınır.
     @MainActor
-    static func live() -> ScanEnvironment {
+    static func live(areas: Set<UsageArea> = UsageProfile.load()) -> ScanEnvironment {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let running = RunningApps.snapshot()
         return ScanEnvironment(
@@ -37,7 +37,8 @@ extension ScanEnvironment {
             lastUsed: { Spotlight.lastUsed($0) },
             dateAdded: { Spotlight.dateAdded($0) },
             iCloudStatus: ICloudStatus.read(),
-            screenshotFolder: ScreenshotSettings.location(home: home)
+            screenshotFolder: ScreenshotSettings.location(home: home),
+            areas: areas
         )
     }
 }

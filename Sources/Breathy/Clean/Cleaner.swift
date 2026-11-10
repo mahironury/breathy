@@ -123,8 +123,8 @@ struct Cleaner: Sendable {
             return Scanner.mediaCacheOwner(of: finding.path, runningApps: runningApps)
         case .hiddenFolders:
             return Scanner.hiddenFolderOwner(of: finding.path, home: home.path, runningApps: runningApps)
-        case .devTools:
-            return Scanner.devToolOwner(of: finding.path, home: home.path, runningApps: runningApps)
+        case .devTools, .games:
+            return Scanner.knownAppOwner(of: finding.path, home: home.path, runningApps: runningApps)
         default:
             return finding.inUseBy
         }

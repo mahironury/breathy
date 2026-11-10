@@ -26,8 +26,8 @@ extension Scanner {
                 let url = env.home.appending(path: sub, directoryHint: .isDirectory)
 
                 // Bilinen bir aracın verisi (ör. Antigravity'nin eski IDE klasörü): içinde proje geçmişi
-                // olabilir. "Eski kopya" diye seçtirilmez; eski kayıtları devToolData ayrıca listeler.
-                if let known = Self.devTool(containing: sub) {
+                // olabilir. "Eski kopya" diye seçtirilmez; eski kayıtları knownAppData ayrıca listeler.
+                if let known = Self.knownApp(containing: sub) {
                     guard known.root == sub else { continue }  // aracın iç düzenini kurallar biliyor
                     let present = known.tool.history.filter {
                         FileManager.default.fileExists(atPath: url.appending(path: $0).path)

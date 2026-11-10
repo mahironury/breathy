@@ -19,7 +19,12 @@ Gereken: macOS 14 (Sonoma) ya da daha yenisi. Apple Silicon ve Intel Mac'lerde �
    Sonra paneldeki "Yeniden başlat"a bas.
    (İzin olmadan Breathy hiçbir klasörü taramaz.)
 
-4) Bildirim izni sorulursa "İzin Ver"e bas. Boş alan 10 GB'ın altına inince
+4) "Bu Mac'i ne için kullanıyorsun?" ekranında alanlarını seç: yazılım geliştirme,
+   yapay zekâ kodlama araçları, fotoğraf/video/tasarım, oyun. Breathy seçtiklerine
+   özellikle bakar; günlük kullanım her zaman taranır. Sonra paneldeki "Odak"
+   satırından değiştirebilirsin.
+
+5) Bildirim izni sorulursa "İzin Ver"e bas. Boş alan 10 GB'ın altına inince
    tek bir uyarı gönderir.
 
 Güncelleme: 0.2'den itibaren Breathy günde bir kez yeni sürüm olup olmadığına bakar.

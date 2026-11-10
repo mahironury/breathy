@@ -137,7 +137,7 @@ extension Scanner {
                 // (Final Cut kurulu değilse macOS bunu paket saymaz; o yüzden uzantıya bakılır.)
                 if ext == "fcpbundle" {
                     e.skipDescendants()
-                    let caches = try finalCutCaches(in: url, ctx)
+                    let caches = env.areas.contains(.media) ? try finalCutCaches(in: url, ctx) : []
                     out.findings += caches
                     let total = try measure(url, ctx)
                     tally(url.path + "/", total)
@@ -150,7 +150,9 @@ extension Scanner {
                     e.skipDescendants()
                     let bytes = try measure(url, ctx)
                     tally(url.path + "/", bytes)
-                    if let f = lightroomPreviews(url, name: name, bytes: bytes, ctx) { out.findings.append(f) }
+                    if env.areas.contains(.media), let f = lightroomPreviews(url, name: name, bytes: bytes, ctx) {
+                        out.findings.append(f)
+                    }
                     continue
                 }
 
@@ -170,9 +172,10 @@ extension Scanner {
                     continue
                 }
 
+                let scansDevelopment = env.areas.contains(.development)
                 if name == "node_modules" {
-                    e.skipDescendants()
-                    if isStaleDevProject(parent) {
+                    e.skipDescendants()  // geliştirici seçilmese de içine girilmez (binlerce paket dosyası)
+                    if scansDevelopment, isStaleDevProject(parent) {
                         let bytes = try measure(url, ctx)
                         tally(url.path + "/", bytes)
                         if bytes >= limits.minItemBytes,
@@ -187,7 +190,7 @@ extension Scanner {
                 if let markers = Self.buildOutputMarkers[name],
                    markers.contains(where: { fm.fileExists(atPath: parent.appending(path: $0).path) }) {
                     e.skipDescendants()  // derleme çıktısının içindeki dosyaları büyük dosya diye sayma
-                    if isStaleDevProject(parent) {
+                    if scansDevelopment, isStaleDevProject(parent) {
                         let bytes = try measure(url, ctx)
                         tally(url.path + "/", bytes)
                         if bytes >= limits.minItemBytes,
@@ -201,7 +204,7 @@ extension Scanner {
 
                 if Self.venvNames.contains(name), fm.fileExists(atPath: url.appending(path: "pyvenv.cfg").path) {
                     e.skipDescendants()
-                    if isStaleProject(parent) {  // pyvenv.cfg zaten bunun bir geliştirme ortamı olduğunu gösterir
+                    if scansDevelopment, isStaleProject(parent) {  // pyvenv.cfg zaten geliştirme ortamı olduğunu gösterir
                         let bytes = try measure(url, ctx)
                         tally(url.path + "/", bytes)
                         if bytes >= limits.minItemBytes,

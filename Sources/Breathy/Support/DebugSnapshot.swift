@@ -23,6 +23,7 @@ enum DebugSnapshot {
            let data = try? Data(contentsOf: URL(fileURLWithPath: args[j + 1])),
            var scan = try? JSONDecoder().decode(ScanResult.self, from: data) {
             if args.contains("--demo") {  // yeni panel parçalarını görmek için örnek veri
+                model.showAreasForPreview([.development, .aiCoding, .media])
                 scan.growthSince = scan.date.addingTimeInterval(-3 * 86_400)
                 scan.growth = [
                     GrowthItem(key: "Library/Group Containers/group.net.whatsapp.WhatsApp.shared",
@@ -30,9 +31,11 @@ enum DebugSnapshot {
                     GrowthItem(key: "Downloads", title: "İndirilenler", bytes: 9_000_000_000, delta: 1_100_000_000),
                     GrowthItem(key: "Movies/Kurgu", title: "Filmler/Kurgu", bytes: 4_000_000_000, delta: 600_000_000),
                 ]
-                model.showUpdateForPreview(ReleaseInfo(
-                    version: "0.3.0", notes: "", pageURL: URL(string: "https://github.com")!,
-                    zipURL: URL(string: "https://github.com")!))
+                if args.contains("--demo-update") {
+                    model.showUpdateForPreview(ReleaseInfo(
+                        version: "0.3.0", notes: "", pageURL: URL(string: "https://github.com")!,
+                        zipURL: URL(string: "https://github.com")!))
+                }
             }
             model.loadForPreview(scan)
         }
@@ -58,6 +61,7 @@ enum DebugSnapshot {
                 await capture(DetailsView(model: model), size: NSSize(width: 900, height: 600),
                               to: out.appending(path: "gercek-detaylar-\(name).png"))
             }
+            await capture(UsageProfileView(model: model), size: nil, to: out.appending(path: "gercek-profil.png"))
             NSApp.terminate(nil)
         }
     }
@@ -76,8 +80,13 @@ enum DebugSnapshot {
         window.orderFrontRegardless()  // ekran dışında
         try? await Task.sleep(for: settle)  // listeler satırlarını yerleştirsin, animasyonlar bitsin
         hosting.layoutSubtreeIfNeeded()
-        if let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
-            hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        // Ekran 1x olsa da 2x çiz (README görselleri Retina ekranlarda net görünsün).
+        let bounds = hosting.bounds
+        if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
+                                      bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+            rep.size = bounds.size
+            hosting.cacheDisplay(in: bounds, to: rep)
             try? rep.representation(using: .png, properties: [:])?.write(to: url)
         }
         window.orderOut(nil)

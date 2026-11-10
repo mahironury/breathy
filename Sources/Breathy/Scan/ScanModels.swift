@@ -15,7 +15,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
     case oldInstallers, largeFiles, unusedApps, appLeftovers
     case screenCaptures, duplicates
     case appData, iosBackups, docker, photosLibrary, iCloudArchive
-    case hiddenFolders, devTools
+    case hiddenFolders, devTools, games
 
     var title: String {
         switch self {
@@ -40,6 +40,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .photosLibrary: "Fotoğraflar kütüphanesi"
         case .hiddenFolders: "Büyük gizli klasörler"
         case .devTools: "Geliştirici araçlarının kayıtları"
+        case .games: "Oyunlar ve oyun önbellekleri"
         }
     }
 
@@ -53,6 +54,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .iCloudArchive: "iCloud arşivi"
         case .hiddenFolders: "Gizli klasörler"
         case .devTools: "Geliştirici araçları"
+        case .games: "Oyunlar"
         default: title
         }
     }
@@ -80,6 +82,7 @@ enum ScanCategory: String, Codable, Sendable, CaseIterable {
         case .photosLibrary: "photo.on.rectangle"
         case .hiddenFolders: "questionmark.folder"
         case .devTools: "wrench.and.screwdriver"
+        case .games: "gamecontroller"
         }
     }
 }

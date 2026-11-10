@@ -1,9 +1,9 @@
 import Foundation
 
-/// Bir geliştirici ya da yapay zekâ aracının veri düzeni: hangi alt klasörler yeniden oluşur ya da
-/// sadece kayıttır (temizlenebilir), hangileri geçmiştir (sohbetler, planlar, dosya geçmişi).
+/// Bir uygulamanın veri düzeni: hangi alt klasörler yeniden oluşur ya da sadece kayıttır
+/// (temizlenebilir), hangileri geçmiştir (sohbetler, planlar, dosya geçmişi, oyun kayıtları).
 /// Geçmiş asla önerilmez: kullanıcı GitHub'a göndermediği işleri orada bulabilir.
-struct DevTool: Sendable {
+struct AppKnowledge: Sendable {
     struct Part: Sendable {
         /// Veri klasörüne göre yol.
         let path: String
@@ -22,9 +22,15 @@ struct DevTool: Sendable {
     /// kardeşler (".gemini/antigravity*" → antigravity, antigravity-ide, antigravity-cli…).
     let roots: [String]
     var excludedRoots: [String] = []
+    /// Bulguların kategorisi ve hangi kullanım alanlarında taranacağı.
+    var category: ScanCategory = .devTools
+    var areas: Set<UsageArea>
     let cleanable: [Part]
     /// Geçmiş (veri klasörüne göre). Breathy bunlara dokunmaz; notlarda adı geçer.
     let history: [String]
+    /// true: uygulama klasörünün toplamı ayrıca "Büyük uygulama verileri"nde gösterilmez
+    /// (bulgular zaten neyin yer kapladığını söylüyor, ör. kurulu oyunlar).
+    var replacesAppDataInfo = false
 
     /// `rel` (ev klasörüne göre) bu aracın veri klasörlerinden biri mi?
     func isRoot(_ rel: String) -> Bool {
@@ -39,7 +45,7 @@ struct DevTool: Sendable {
 
 extension Scanner {
     /// VS Code ailesi editörlerin (VS Code, Cursor, Antigravity, Windsurf…) ortak düzeni.
-    static let editorCaches: [DevTool.Part] = [
+    static let editorCaches: [AppKnowledge.Part] = [
         .init(path: "CachedData", risk: .safe, note: "Editörün eski sürümlerinden kalan önbellek — yeniden oluşur"),
         .init(path: "CachedExtensionVSIXs", risk: .safe, note: "İndirilmiş eklenti paketleri — gerekirse yeniden indirilir"),
         .init(path: "logs", risk: .safe, note: "Editör logları"),
@@ -49,11 +55,12 @@ extension Scanner {
     ]
     static let editorHistory = ["User/History", "User/workspaceStorage", "User/globalStorage"]
 
-    /// Bilinen araçlar. Yeni bir araç eklemek için bir satır yeter.
-    static let devTools: [DevTool] = [
-        DevTool(
+    /// Bilinen uygulamalar. Yeni bir uygulama eklemek için bir satır yeter.
+    static let appKnowledge: [AppKnowledge] = [
+        AppKnowledge(
             name: "Antigravity", owners: ["antigravity"],
             roots: [".gemini/antigravity*"], excludedRoots: [".gemini/antigravity-browser-profile"],
+            areas: [.aiCoding],
             cleanable: [
                 .init(path: "browser_recordings", risk: .review, eachChild: true, suggestAfterDays: 30,
                       note: "Tarayıcı ajanının ekran kaydı (sadece görüntü) — sohbetler, planlar ve kod etkilenmez"),
@@ -61,26 +68,44 @@ extension Scanner {
             ],
             history: ["conversations", "brain", "code_tracker", "implicit", "knowledge", "annotations"]
         ),
-        DevTool(name: "Antigravity", owners: ["antigravity"], roots: ["Library/Application Support/Antigravity"],
-                cleanable: editorCaches, history: editorHistory),
-        DevTool(name: "Visual Studio Code", owners: ["com.microsoft.vscode"],
-                roots: ["Library/Application Support/Code", "Library/Application Support/Code - Insiders"],
-                cleanable: editorCaches, history: editorHistory),
-        DevTool(name: "Cursor", owners: ["cursor", "com.todesktop.230313mzl4w4u92"],
-                roots: ["Library/Application Support/Cursor"], cleanable: editorCaches, history: editorHistory),
-        DevTool(name: "Windsurf", owners: ["windsurf"], roots: ["Library/Application Support/Windsurf"],
-                cleanable: editorCaches, history: editorHistory),
-        DevTool(name: "VSCodium", owners: ["vscodium"], roots: ["Library/Application Support/VSCodium"],
-                cleanable: editorCaches, history: editorHistory),
+        // VS Code ailesi: hem yazılım geliştirme hem yapay zekâ kodlama araçları (Cursor, Windsurf…).
+        AppKnowledge(name: "Antigravity", owners: ["antigravity"], roots: ["Library/Application Support/Antigravity"],
+                     areas: [.development, .aiCoding], cleanable: editorCaches, history: editorHistory),
+        AppKnowledge(name: "Visual Studio Code", owners: ["com.microsoft.vscode"],
+                     roots: ["Library/Application Support/Code", "Library/Application Support/Code - Insiders"],
+                     areas: [.development, .aiCoding], cleanable: editorCaches, history: editorHistory),
+        AppKnowledge(name: "Cursor", owners: ["cursor", "com.todesktop.230313mzl4w4u92"],
+                     roots: ["Library/Application Support/Cursor"],
+                     areas: [.development, .aiCoding], cleanable: editorCaches, history: editorHistory),
+        AppKnowledge(name: "Windsurf", owners: ["windsurf"], roots: ["Library/Application Support/Windsurf"],
+                     areas: [.development, .aiCoding], cleanable: editorCaches, history: editorHistory),
+        AppKnowledge(name: "VSCodium", owners: ["vscodium"], roots: ["Library/Application Support/VSCodium"],
+                     areas: [.development, .aiCoding], cleanable: editorCaches, history: editorHistory),
         // Oturum geçmişi ve hafıza: hiçbir şeyi temizlenebilir değil.
-        DevTool(name: "Claude Code", owners: [], roots: [".claude"], cleanable: [],
-                history: ["projects", "file-history", "todos", "sessions"]),
+        AppKnowledge(name: "Claude Code", owners: [], roots: [".claude"], areas: [.aiCoding], cleanable: [],
+                     history: ["projects", "file-history", "todos", "sessions"]),
+        // Oyun: önbellekler yeniden oluşur; kurulu oyunlar sadece bilgi; kayıtlı oyunlara dokunulmaz.
+        AppKnowledge(
+            name: "Steam", owners: ["com.valvesoftware.steam"], roots: ["Library/Application Support/Steam"],
+            category: .games, areas: [.gaming],
+            cleanable: [
+                .init(path: "appcache", risk: .safe, note: "Steam önbelleği — yeniden oluşur"),
+                .init(path: "depotcache", risk: .safe, note: "İndirme önbelleği — yeniden oluşur"),
+                .init(path: "logs", risk: .safe, note: "Steam logları"),
+                .init(path: "steamapps/shadercache", risk: .safe,
+                      note: "Gölgelendirici önbelleği — oyun açılınca yeniden oluşur"),
+                .init(path: "steamapps/common", risk: .info, eachChild: true,
+                      note: "Kurulu oyun — gerekmiyorsa Steam'den kaldır (Kitaplık → sağ tık → Yönet → Kaldır)"),
+            ],
+            history: ["userdata", "config"],
+            replacesAppDataInfo: true
+        ),
     ]
 
-    func devToolData(_ ctx: ScanContext) throws -> [Finding] {
+    func knownAppData(_ ctx: ScanContext) throws -> [Finding] {
         let fm = FileManager.default
         var out: [Finding] = []
-        for tool in Self.devTools where !tool.cleanable.isEmpty {
+        for tool in Self.appKnowledge where !tool.cleanable.isEmpty && !tool.areas.isDisjoint(with: env.areas) {
             let owner = Self.runningApp(matching: tool.owners, in: env.runningApps)
             for root in resolveRoots(of: tool) {
                 for part in tool.cleanable {
@@ -97,9 +122,9 @@ extension Scanner {
                         guard bytes >= limits.minItemBytes else { continue }
                         let modified = try? item.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                         let suggested = part.suggestAfterDays.map { days in modified.map { daysSince($0) >= days } ?? false } ?? true
-                        if let f = makeFinding(item, .devTools, part.risk, bytes: bytes, suggested: suggested,
+                        if let f = makeFinding(item, tool.category, part.risk, bytes: bytes, suggested: suggested,
                                                lastUsed: modified, note: "\(tool.name): \(part.note)",
-                                               inUseBy: owner, ctx: ctx) {
+                                               inUseBy: owner, areas: tool.areas, ctx: ctx) {
                             out.append(f)
                         }
                     }
@@ -110,7 +135,7 @@ extension Scanner {
     }
 
     /// Bir aracın gerçekte var olan veri klasörleri ("*" açılır).
-    func resolveRoots(of tool: DevTool) -> [URL] {
+    func resolveRoots(of tool: AppKnowledge) -> [URL] {
         let fm = FileManager.default
         var out: [URL] = []
         for root in tool.roots {
@@ -134,19 +159,19 @@ extension Scanner {
 
     /// Ev klasörüne göre yolu içeren araç ve onun veri klasörü (ör. ".gemini/antigravity-ide/brain" →
     /// Antigravity, ".gemini/antigravity-ide").
-    static func devTool(containing rel: String) -> (tool: DevTool, root: String)? {
+    static func knownApp(containing rel: String) -> (tool: AppKnowledge, root: String)? {
         let parts = rel.split(separator: "/").map(String.init)
         guard !parts.isEmpty else { return nil }
         for length in 1...parts.count {
             let candidate = parts.prefix(length).joined(separator: "/")
-            if let tool = devTools.first(where: { $0.isRoot(candidate) }) { return (tool, candidate) }
+            if let tool = appKnowledge.first(where: { $0.isRoot(candidate) }) { return (tool, candidate) }
         }
         return nil
     }
 
-    /// Geliştirici aracının verisini kullanan uygulama şu an açık mı? Silmeden hemen önce de sorulur.
-    static func devToolOwner(of path: String, home: String, runningApps: [String: String]) -> String? {
-        guard path.hasPrefix(home + "/"), let match = devTool(containing: String(path.dropFirst(home.count + 1))) else {
+    /// Verisi bilinen uygulama şu an açık mı? Silmeden hemen önce de sorulur.
+    static func knownAppOwner(of path: String, home: String, runningApps: [String: String]) -> String? {
+        guard path.hasPrefix(home + "/"), let match = knownApp(containing: String(path.dropFirst(home.count + 1))) else {
             return nil
         }
         return runningApp(matching: match.tool.owners, in: runningApps)

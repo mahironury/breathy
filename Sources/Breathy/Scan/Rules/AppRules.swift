@@ -39,6 +39,7 @@ extension Scanner {
                         out.append(f)
                     }
                 } else if bytes >= limits.appDataBytes,
+                          Self.knownApp(containing: "\(root.path)/\(name)").map({ !$0.tool.replacesAppDataInfo }) ?? true,
                           let f = makeFinding(child, .appData, .info, bytes: bytes,
                                               note: Self.appDataTip(for: lower), ctx: ctx) {
                     out.append(f)

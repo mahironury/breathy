@@ -41,6 +41,8 @@ final class AppModel {
     private(set) var loginItem: LoginItem.State = .unavailable
     /// "Bunu bir daha önerme" listesi.
     private(set) var ignored = IgnoreList.load()
+    /// Kullanıcının seçtiği kullanım alanları (ilk açılışta sorulur).
+    private(set) var areas = UsageProfile.load()
     /// GitHub'da daha yeni bir sürüm varsa dolu.
     private(set) var update: ReleaseInfo?
     private(set) var isUpdating = false
@@ -97,6 +99,44 @@ final class AppModel {
         notifier.onOpen = { [weak self] in self?.openDetails() }
         lowSpace = notifier
         if let disk { notifier.check(disk) }
+        // İlk açılışta: "Bu Mac'i ne için kullanıyorsun?"
+        if !UsageProfile.wasAsked() {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                showUsageProfile()
+            }
+        }
+    }
+
+    // MARK: - Kullanım alanları
+
+    func showUsageProfile() {
+        UsageProfileWindowController.shared.show(model: self)
+    }
+
+    /// Seçimi kaydeder; eski sonuçtan artık seçili olmayan alanların bulgularını çıkarır.
+    func setAreas(_ new: Set<UsageArea>) {
+        let added = !new.subtracting(areas).isEmpty
+        areas = new
+        UsageProfile.save(new)
+        if var scan = lastScan {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            scan.removeFindings { !Scanner.isAllowed($0, in: new, home: home) }
+            lastScan = scan
+            selection = selection.filter { path in scan.findings.contains { $0.path == path } }
+            if persistsResults { ResultStore.save(scan) }
+        }
+        show(added && lastScan != nil ? "Yeni seçtiğin alanlar için yeniden tara." : "✓ Kullanım alanları kaydedildi.")
+    }
+
+    /// Geliştirme önizlemesi: seçimi kaydetmeden gösterir.
+    func showAreasForPreview(_ preview: Set<UsageArea>) {
+        areas = preview
+    }
+
+    /// "Şimdilik atla": bütün alanlar taranmaya devam eder, ekran bir daha kendiliğinden açılmaz.
+    func skipUsageProfile() {
+        UsageProfile.markAsked()
     }
 
     func panelOpened() {
@@ -207,7 +247,7 @@ final class AppModel {
             return
         }
 
-        let scanner = Scanner(env: .live())
+        let scanner = Scanner(env: .live(areas: areas))
         scanProgress = ScanProgress()
         let sink: @Sendable (ScanProgress) -> Void = { [weak self] progress in
             Task { @MainActor in

@@ -1,39 +1,73 @@
 # Breathy
 
-Mac'ine nefes aldıran, menü çubuğunda yaşayan hafif bir disk temizleyici.
+**Mac'ine nefes aldır.** Breathy, menü çubuğunda duran küçük bir yardımcı. Diskinin ne kadar dolu olduğunu her an gösterir, yer kaplayan gereksiz dosyaları bulur ve onları senin onayınla temizler.
 
-- Menü çubuğunda boş alanı gösterir; panelde doluluk yüzdesi, tek dokunuşla Çöp'ü boşaltma ve tarama.
-- Önbellekleri, logları, eski `node_modules` ve derleme çıktılarını, eski kurulum dosyalarını, büyük ve çift dosyaları, kaldırılmış uygulamaların artıklarını bulur.
-- Büyük gizli klasörleri (`~/.gemini`, `~/.colima`…) gösterir; aylardır dokunulmamış eski kopyaları ayrıca belirtir.
-- Geliştirici araçlarının (VS Code, Cursor, Antigravity, Windsurf) yeniden oluşan önbelleklerini ve eski ekran kayıtlarını bulur. Sohbet geçmişine, planlara ve dosyaların yerel geçmişine dokunmaz.
-- Fotoğraf/video için Lightroom önizlemelerini ve Final Cut Pro render dosyalarını, iPhone/iPad için eski güncelleme dosyalarını bulur.
-- Geçen taramadan beri en çok büyüyen klasörleri gösterir.
-- Türe göre temizler: kendiliğinden yeniden oluşanlar (önbellek, log, `node_modules`) doğrudan silinir; kişisel dosyalar Çöp'e gider. Panelden tek tıkla sadece güvenli olanlar temizlenir.
-- Arka planda tarama yapmaz. Boş alan 10 GB'ın altına inince tek bir bildirim gönderir.
+<p align="center">
+  <img src="docs/menu-cubugu.png" width="93" alt="Menü çubuğunda Breathy: rüzgâr simgesi ve boş alan">
+</p>
 
-Gereken: macOS 14 (Sonoma) ya da daha yenisi. Apple Silicon ve Intel.
+<p align="center">
+  <img src="docs/panel.png" width="320" alt="Breathy paneli: doluluk, Çöp, tarama sonucu ve büyüyen klasörler">
+</p>
 
-## Kurulum
+## Neden?
 
-[Releases](../../releases/latest) sayfasından `Breathy-<sürüm>.zip` dosyasını indir, `Breathy.app`'i Uygulamalar klasörüne sürükle ve [Kurulum.txt](scripts/Kurulum.txt) adımlarını izle. Uygulama Apple onaylı olmadığı için ilk açılışta Sistem Ayarları → Gizlilik ve Güvenlik → **Yine de Aç** gerekir. Tarama için Tam Disk Erişimi izni istenir.
+Disk dolunca neyin yer kapladığını bulmak zordur. Asıl yer kaplayanlar genelde göremediğin yerlerdedir: uygulamaların biriktirdiği önbellekler, aylardır açmadığın eski projelerin kalıntıları, kurduktan sonra unuttuğun dosyalar, aynı belgenin kopyaları, kaldırdığın uygulamalardan geride kalanlar.
 
-**Güncellemeler:** Breathy günde bir kez bu depodaki son sürüme bakar; yeni sürüm varsa panelde **Güncelle** düğmesi çıkar. İndirilen uygulama aynı sertifikayla imzalı değilse kurulmaz.
+Breathy bunların hepsine bakar ve sana anlaşılır bir liste sunar: neyin ne kadar yer kapladığını, silmenin güvenli olup olmadığını ve neden önerildiğini.
 
-## Kaynaktan derleme
+**Gerçek bir örnek:** Breathy'nin geliştirildiği Mac'te diskin %95'i doluydu, sadece 11 GB boş yer kalmıştı. Birkaç temizlikten sonra boş yer 70 GB'ı geçti. Açılan yerin neredeyse tamamı önbelleklerden, eski proje kalıntılarından ve bir yapay zekâ aracının aylardır kullanılmayan kopyalarından geldi.
 
-Xcode gerekmez; Command Line Tools (Swift 6) yeterli.
+## Neler yapar?
 
-```bash
-./scripts/setup-signing.sh   # bir kez: yerel imza sertifikası
-./build.sh                   # derle, ~/Applications'a kur ve başlat
-```
+- **Her an görünür:** Menü çubuğunda boş alanı gösterir. Panelde doluluk yüzdesi ve renkli bir çubuk vardır.
+- **Tek tıkla Çöp:** Çöp'ün ne kadar yer kapladığını gösterir, tek tıkla boşaltır.
+- **Akıllı tarama:** Bir dakika içinde bütün ev klasörünü tarar ve bulduklarını gruplara ayırır.
+- **Güvenli temizlik:** Kendiliğinden yeniden oluşan dosyaları (önbellekler, loglar) siler. Senin dosyalarını ise sadece Çöp'e taşır, istersen geri alabilirsin.
+- **Ne büyüdü?:** Son taramadan beri en çok büyüyen klasörleri gösterir. Örneğin "WhatsApp +2,4 GB".
+- **iCloud'u anlar:** iCloud'unu neyin doldurduğunu ve ekran görüntülerinin nereye kaydedildiğini gösterir.
+- **Zamanında haber verir:** Boş yer 10 GB'ın altına inince bir kez uyarır.
+- **Kendini günceller:** Yeni sürüm çıkınca panelde **Güncelle** düğmesi belirir.
 
-Kendi derlediğin kopya kendi sertifikanla imzalanır; bu depodaki sürümlerle güncellenmez.
+## Senin kullanımına göre tarar
 
-## Güvenlik ilkeleri
+İlk açılışta Breathy bu Mac'i ne için kullandığını sorar. Seçtiğin alanlara özellikle bakar, diğerlerini atlar. Böylece sonuçlar sana göre olur ve tarama hızlanır.
 
-- Silme kararını her zaman kullanıcı verir; otomatik ya da zamanlanmış silme yok.
-- Anahtar zinciri, Mail, Mesajlar, Fotoğraflar arşivi, iCloud Drive, SSH anahtarları ve tercihler gibi yerlere hiçbir koşulda dokunulmaz.
-- Açık bir uygulamanın verisi silinmez; çift dosyalarda her grupta en az bir kopya kalır.
-- Her öğe silinmeden hemen önce yeniden denetlenir.
-- Ağ isteği yalnızca güncelleme denetimi için GitHub'a yapılır.
+<p align="center">
+  <img src="docs/kullanim-alanlari.png" width="600" alt="Bu Mac'i ne için kullanıyorsun? ekranı">
+</p>
+
+| Alan | Breathy neye bakar |
+|---|---|
+| Herkes için (her zaman) | Uygulama önbellekleri ve loglar, eski kurulum dosyaları, unutulmuş büyük dosyalar, aynı dosyanın kopyaları, eski ekran görüntüleri, kaldırılmış uygulamaların artıkları, büyük gizli klasörler |
+| Yazılım geliştirme | Aylardır dokunulmamış projelerin indirilmiş paketleri ve derleme çıktıları, paket önbellekleri, Xcode ve simülatör artıkları, Docker |
+| Yapay zekâ kodlama araçları | Antigravity, Cursor ve VS Code'un önbellekleri ve eski ekran kayıtları. Sohbet geçmişine ve planlara dokunulmaz. |
+| Fotoğraf, video ve tasarım | Lightroom önizlemeleri, Final Cut Pro render dosyaları, Adobe ve DaVinci önbellekleri |
+| Oyun | Steam önbellekleri ve kurulu oyunların kapladığı yer. Oyun kayıtlarına dokunulmaz. |
+
+## Nasıl kullanılır?
+
+1. **İndir:** [Releases](../../releases/latest) sayfasından Breathy'yi indir, `Breathy.app`'i Uygulamalar klasörüne sürükle ve aç. Uygulama App Store'dan gelmediği için ilk açılışta Sistem Ayarları → Gizlilik ve Güvenlik → **Yine de Aç** demen gerekir. Bunu sadece bir kez yaparsın.
+2. **İzin ver:** Breathy'nin klasörleri görebilmesi için bir izin gerekir. Panel seni adım adım ayarlara yönlendirir.
+3. **Kullanım alanını seç:** Yazılım, yapay zekâ araçları, fotoğraf/video ya da oyun. Hiçbirini seçmesen de günlük kullanım her zaman taranır.
+4. **Tara:** Menü çubuğundaki rüzgâr simgesine bas, **Taramayı Başlat**'a tıkla.
+5. **Temizle:** **Güvenli olanları temizle** ile tek tıkla temizleyebilirsin. Ya da **Detaylar**'ı açıp tek tek seçebilirsin; her dosyayı önizleyebilir, Finder'da görebilirsin.
+6. **Çöp'ü boşalt:** Çöp'e taşınanlar, Çöp'ü boşaltınca yer açar.
+
+<p align="center">
+  <img src="docs/detaylar.png" width="720" alt="Detaylar penceresi: kategoriler, dosyalar ve temizlik">
+</p>
+
+## Güvende misin?
+
+- **Sen onaylamadan hiçbir şey silinmez.** Otomatik ya da zamanlanmış silme yoktur.
+- **Senin dosyaların Çöp'e gider.** Belgeler, fotoğraflar, videolar asla doğrudan silinmez.
+- **Önemli yerlere dokunmaz:** Fotoğraflar arşivi, Mail, Mesajlar, iCloud Drive, şifreler ve uygulamaların sohbet geçmişleri korunur.
+- **Açık uygulamalara saygı duyar:** Çalışan bir uygulamanın verisi silinmez. Önce kapatman istenir.
+- **Her kopyadan biri kalır:** Aynı dosyanın kopyalarından en az biri her zaman korunur.
+- **Bilgisayarı yavaşlatmaz:** Arka planda tarama yapmaz, sadece sen istediğinde çalışır. Boştayken neredeyse hiç kaynak kullanmaz.
+- **Verin sende kalır:** Breathy internete sadece yeni sürüm var mı diye bakmak için bağlanır.
+
+## Gereken
+
+macOS 14 (Sonoma) ya da daha yenisi. Apple Silicon ve Intel Mac'lerde çalışır.

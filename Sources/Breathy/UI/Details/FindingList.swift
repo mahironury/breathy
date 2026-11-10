@@ -99,6 +99,8 @@ struct FindingList: View {
         case .largeFiles: text += " 6 aydır açılmayanlar işaretlendi."
         case .screenCaptures: text += " 30 günden eskiler işaretlendi."
         case .nodeModules, .buildOutputs, .pythonEnvs: text += " Sadece 90 gündür dokunulmamış projeler."
+        case .games:
+            text = "Oyunların önbellekleri yeniden oluşur ve doğrudan silinir. Kurulu oyunlar sadece bilgi: gerekmiyorsa Steam'den kaldır. Kayıtlı oyunlarına dokunulmaz."
         case .devTools:
             text = "Kodlama ve yapay zekâ araçlarının (VS Code, Cursor, Antigravity…) yeniden oluşan önbellekleri ve eski ekran kayıtları. Sohbet geçmişi, planlar ve dosyaların yerel geçmişi asla önerilmez. Araç açıksa önce kapat."
         case .hiddenFolders:

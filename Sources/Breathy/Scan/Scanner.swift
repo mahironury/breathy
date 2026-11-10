@@ -39,6 +39,8 @@ struct ScanEnvironment: Sendable {
     var iCloudStatus: ICloudStatus
     /// macOS'un ekran görüntülerini kaydettiği klasör.
     var screenshotFolder: URL
+    /// Kullanıcının seçtiği kullanım alanları; seçilmeyenlerin kuralları atlanır.
+    var areas: Set<UsageArea> = Set(UsageArea.allCases)
 }
 
 /// Tek seferlik disk taraması. Senkron çalışır; `Task.detached(priority: .background)` içinde çağrılır,
@@ -58,8 +60,8 @@ struct Scanner: Sendable {
         try ctx.phase("Uygulama verileri")
         findings += try libraryAppData(ctx)
 
-        try ctx.phase("Geliştirici araçları")
-        findings += try devToolData(ctx)
+        try ctx.phase("Geliştirici araçları ve oyunlar")
+        findings += try knownAppData(ctx)
 
         try ctx.phase("Uygulamalar")
         findings += try unusedApps(ctx)
@@ -150,8 +152,10 @@ struct Scanner: Sendable {
     func makeFinding(
         _ url: URL, _ category: ScanCategory, _ risk: Risk, bytes: Int64,
         suggested: Bool = true, lastUsed: Date? = nil, note: String? = nil, inUseBy: String? = nil,
-        groupID: String? = nil, ctx: ScanContext
+        groupID: String? = nil, areas: Set<UsageArea>? = nil, ctx: ScanContext
     ) -> Finding? {
+        // Kullanıcının seçmediği alanların bulguları üretilmez (kuralların çoğu zaten ölçmeden atlar).
+        if let required = areas ?? category.area.map({ [$0] }), required.isDisjoint(with: env.areas) { return nil }
         if risk != .info, !PathGuard.canDelete(url, home: env.home, appDirs: env.applicationDirs) { return nil }
         let finding = Finding(
             path: url.path, category: category, risk: risk, bytes: bytes,

@@ -93,6 +93,10 @@ extension Scanner {
         var out: [Finding] = []
 
         for rule in Self.locationRules {
+            // ~/.cache hem geliştiricinin hem yapay zekâ araçlarının (modeller) alanı.
+            let ruleAreas: Set<UsageArea>? = rule.path == ".cache"
+                ? [.development, .aiCoding] : rule.category.area.map { [$0] }
+            if let ruleAreas, ruleAreas.isDisjoint(with: env.areas) { continue }
             let root = env.home.appending(path: rule.path)
             guard fm.fileExists(atPath: root.path) else { continue }
 
@@ -108,28 +112,35 @@ extension Scanner {
                 // Sistem önbelleklerine ve kendimize dokunmayız.
                 if rule.eachChild, lower.hasPrefix("com.apple.") || lower == env.ownBundleID.lowercased() { continue }
 
+                var category = rule.category
+                var risk = rule.risk
+                var note = rule.note
+                var areas: Set<UsageArea>? = nil
+                // Geliştirici değilse paket yöneticisi önbellekleri sıradan uygulama önbelleği sayılır.
+                if rule.path == "Library/Caches", Self.devCacheNames.contains(lower), env.areas.contains(.development) {
+                    category = .devCaches
+                }
+                if rule.path == ".cache", Self.modelCacheNames.contains(lower) {
+                    risk = .review
+                    note = "Yapay zekâ modelleri — silersen yeniden indirilir"
+                    areas = [.development, .aiCoding]
+                }
+                if let required = areas ?? category.area.map({ [$0] }), required.isDisjoint(with: env.areas) { continue }
+
                 ctx.setFolder(target)
                 let bytes = try measure(target, ctx)
                 ctx.addSize(rule.path, bytes)
                 let isInfo = rule.risk == .info
                 let threshold = rule.category == .appData ? limits.appDataBytes : isInfo ? 1 : limits.minItemBytes
                 guard bytes >= threshold else { continue }
-
-                var category = rule.category
-                var risk = rule.risk
-                var note = rule.note
-                if rule.path == "Library/Caches", Self.devCacheNames.contains(lower) { category = .devCaches }
-                if rule.path == ".cache", Self.modelCacheNames.contains(lower) {
-                    risk = .review
-                    note = "Yapay zekâ modelleri — silersen yeniden indirilir"
-                }
                 let inUse: String? = switch category {
                 case .caches, .devCaches: runningOwner(ofCache: lower)
                 case .mediaCaches: Self.mediaCacheOwner(of: target.path, runningApps: env.runningApps)
                 default: nil
                 }
 
-                if let f = makeFinding(target, category, risk, bytes: bytes, note: note, inUseBy: inUse, ctx: ctx) {
+                if let f = makeFinding(target, category, risk, bytes: bytes, note: note, inUseBy: inUse,
+                                       areas: areas, ctx: ctx) {
                     out.append(f)
                 }
             }

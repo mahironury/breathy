@@ -12,6 +12,8 @@ struct ScanSection: View {
                 ScanProgressCard(progress: progress) { model.cancelScan() }
             } else {
                 startButton
+                FocusRow(areas: model.areas) { model.showUsageProfile() }
+                    .padding(.horizontal, 4)
                 if let result = model.lastScan {
                     ScanSummaryView(result: result) { model.openDetails($0) }
                     QuickCleanSection(model: model)
