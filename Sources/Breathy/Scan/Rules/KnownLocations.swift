@@ -8,13 +8,17 @@ extension Scanner {
         let risk: Risk
         let eachChild: Bool       // true: her alt klasör ayrı bulgu
         let note: String?
+        /// false: listelenir ama otomatik işaretlenmez (yeniden oluşturması pahalı ya da kullanıcı emeği).
+        let suggested: Bool
 
-        init(_ path: String, _ category: ScanCategory, _ risk: Risk, eachChild: Bool = false, note: String? = nil) {
+        init(_ path: String, _ category: ScanCategory, _ risk: Risk, eachChild: Bool = false, note: String? = nil,
+             suggested: Bool = true) {
             self.path = path
             self.category = category
             self.risk = risk
             self.eachChild = eachChild
             self.note = note
+            self.suggested = suggested
         }
     }
 
@@ -36,9 +40,11 @@ extension Scanner {
         LocationRule("go/pkg/mod", .devCaches, .review, note: "Go modülleri — projeler yeniden indirir"),
         LocationRule("Library/Developer/Xcode/DerivedData", .xcode, .safe, note: "Xcode derleme ara dosyaları"),
         LocationRule("Library/Developer/Xcode/iOS DeviceSupport", .xcode, .safe, eachChild: true),
-        LocationRule("Library/Developer/Xcode/Archives", .xcode, .review, eachChild: true, note: "Uygulama arşivleri"),
+        LocationRule("Library/Developer/Xcode/Archives", .xcode, .review, eachChild: true,
+                     note: "Uygulama arşivleri (App Store'a gönderilenlerin hata ayıklama bilgisi içinde)", suggested: false),
         LocationRule("Library/Developer/CoreSimulator/Caches", .xcode, .safe),
-        LocationRule("Library/Developer/CoreSimulator/Devices", .xcode, .review, note: "iOS simülatörleri"),
+        LocationRule("Library/Developer/CoreSimulator/Devices", .xcode, .review,
+                     note: "iOS simülatörleri — silersen Xcode yeniden indirir ve kurar", suggested: false),
 
         // Fotoğraf / video / tasarım
         LocationRule("Library/Application Support/Adobe/Common/Media Cache Files", .mediaCaches, .safe, note: "Adobe medya önbelleği"),
@@ -57,7 +63,7 @@ extension Scanner {
         LocationRule("Library/Application Support/MobileSync/Backup", .iosBackups, .info, eachChild: true,
                      note: "Finder'da cihazını seçip yedekleri oradan yönet"),
         LocationRule("Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw", .docker, .info,
-                     note: "Terminal'de 'docker system prune -a' ile küçültülebilir"),
+                     note: "Docker'ın disk görüntüsü — yukarıdaki karttan kullanılmayan imajları temizleyebilirsin"),
         LocationRule("Library/Messages/Attachments", .appData, .info,
                      note: "Mesajlar ekleri — Mesajlar → Ayarlar → Genel → 'Mesajları sakla' süresini kısalt"),
     ]
@@ -67,6 +73,26 @@ extension Scanner {
         "pip", "homebrew", "yarn", "pnpm", "go-build", "ms-playwright", "node-gyp", "typescript",
         "cocoapods", "org.swift.swiftpm", "jetbrains", "deno", "bazel", "electron", "electron-builder",
     ]
+
+    /// Yeniden oluşturması pahalı önbellekler: ses eklentisi taramaları (silinince uygulama bütün
+    /// eklentileri baştan tarar). Listelenir ama otomatik işaretlenmez.
+    static let expensiveCacheMarkers = ["audiounit", "plugin", "vst", "ableton", "native-instruments", "steinberg",
+                                        "presonus", "bitwig", "izotope", "waves", "kontakt", "reaper"]
+
+    /// Önbellek önerisi: uygulama son `cacheFreshDays` gün içinde yazdıysa kullanılıyordur.
+    func cacheSuggestion(name lowercased: String, newest: Date?) -> (suggested: Bool, note: String) {
+        if Self.expensiveCacheMarkers.contains(where: lowercased.contains) {
+            return (false, "Ses eklentisi taraması — silersen uygulama bütün eklentileri baştan tarar")
+        }
+        guard let newest else { return (true, "Önbellek — gerektiğinde yeniden oluşur") }
+        let days = Int(daysSince(newest))
+        if daysSince(newest) < limits.cacheFreshDays {
+            return (false, days == 0
+                ? "Bugün kullanıldı — silersen uygulama hemen yeniden oluşturur"
+                : "\(days) gün önce kullanıldı — silersen uygulama hemen yeniden oluşturur")
+        }
+        return (true, "\(days) gündür kullanılmıyor — gerektiğinde yeniden oluşur")
+    }
 
     /// ~/.cache altında büyük yapay zekâ modelleri: silinirse yeniden indirmek gerekir.
     static let modelCacheNames: Set<String> = ["huggingface", "torch", "lm-studio", "whisper", "ollama"]
@@ -128,19 +154,31 @@ extension Scanner {
                 if let required = areas ?? category.area.map({ [$0] }), required.isDisjoint(with: env.areas) { continue }
 
                 ctx.setFolder(target)
-                let bytes = try measure(target, ctx)
+                // Uygulama önbelleklerinde içindeki en yeni dosyanın tarihine de bakılır (kullanılıyor mu?).
+                let isAppCache = category == .caches
+                let measured: (bytes: Int64, newest: Date?) = isAppCache
+                    ? try measureWithNewest(target, ctx) : (try measure(target, ctx), nil)
+                let bytes = measured.bytes
                 ctx.addSize(rule.path, bytes)
                 let isInfo = rule.risk == .info
                 let threshold = rule.category == .appData ? limits.appDataBytes : isInfo ? 1 : limits.minItemBytes
                 guard bytes >= threshold else { continue }
+                var suggested = rule.suggested
+                var lastUsed: Date? = nil
+                if isAppCache {
+                    let advice = cacheSuggestion(name: lower, newest: measured.newest)
+                    suggested = advice.suggested
+                    note = advice.note
+                    lastUsed = measured.newest
+                }
                 let inUse: String? = switch category {
                 case .caches, .devCaches: runningOwner(ofCache: lower)
                 case .mediaCaches: Self.mediaCacheOwner(of: target.path, runningApps: env.runningApps)
                 default: nil
                 }
 
-                if let f = makeFinding(target, category, risk, bytes: bytes, note: note, inUseBy: inUse,
-                                       areas: areas, ctx: ctx) {
+                if let f = makeFinding(target, category, risk, bytes: bytes, suggested: suggested, lastUsed: lastUsed,
+                                       note: note, inUseBy: inUse, areas: areas, ctx: ctx) {
                     out.append(f)
                 }
             }

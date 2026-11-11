@@ -22,8 +22,34 @@ enum DebugSnapshot {
         if let j = args.firstIndex(of: "--scan"), j + 1 < args.count,
            let data = try? Data(contentsOf: URL(fileURLWithPath: args[j + 1])),
            var scan = try? JSONDecoder().decode(ScanResult.self, from: data) {
+            var demoHistory: [CleanRecord] = []
             if args.contains("--demo") {  // yeni panel parçalarını görmek için örnek veri
                 model.showAreasForPreview([.development, .aiCoding, .media])
+                let home = FileManager.default.homeDirectoryForCurrentUser.path
+                let gb: Int64 = 1_000_000_000
+                scan.folderSizes = [
+                    "Library/Group Containers/group.net.whatsapp.WhatsApp.shared": 45 * gb,
+                    "Library/Application Support/Claude": 12 * gb,
+                    "Library/Application Support/Google": 2_400_000_000,
+                    "Library/Caches": 6 * gb, "Library/Logs": 400_000_000,
+                    "Library/Developer/Xcode/DerivedData": 4 * gb,
+                ]
+                scan.findings.append(Finding(path: home + "/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+                                             category: .docker, risk: .info, bytes: 3_060_000_000, suggested: false,
+                                             note: "Docker'ın disk görüntüsü — yukarıdaki karttan kullanılmayan imajları temizleyebilirsin"))
+                let day: TimeInterval = 86_400
+                for record in [
+                    CleanRecord(date: Date().addingTimeInterval(-9 * day), kind: .selection, freedBytes: 14_400_000_000,
+                                trashedBytes: 120_000_000,
+                                items: [.init(path: home + "/Library/Caches/com.spotify.client", bytes: 1_400_000_000, trashed: false, category: .caches),
+                                        .init(path: home + "/Projeler/eski-site/node_modules", bytes: 1_000_000_000, trashed: false, category: .nodeModules),
+                                        .init(path: home + "/Downloads/Kurulum.dmg", bytes: 120_000_000, trashed: true, category: .oldInstallers)],
+                                itemCount: 3),
+                    CleanRecord(date: Date().addingTimeInterval(-9 * day + 600), kind: .trash, freedBytes: 32_500_000_000,
+                                trashedBytes: 0, items: [], itemCount: 2),
+                    CleanRecord(date: Date().addingTimeInterval(-2 * day), kind: .docker, freedBytes: 1_150_000_000,
+                                trashedBytes: 0, items: [], itemCount: 0),
+                ] { demoHistory.append(record) }
                 if args.contains("--demo-old-copy") {
                     let home = FileManager.default.homeDirectoryForCurrentUser.path
                     model.showOldCopiesForPreview([OldCopy(path: home + "/Downloads/Breathy/Breathy.app", version: "0.2.0")])
@@ -41,7 +67,9 @@ enum DebugSnapshot {
                         zipURL: URL(string: "https://github.com")!))
                 }
             }
-            model.loadForPreview(scan)
+            model.loadForPreview(scan)  // bundan sonra hiçbir şey diske yazılmaz
+            // Örnek geçmiş, önizleme moduna geçildikten sonra eklenir (gerçek history.json'a yazılmasın).
+            for record in demoHistory { model.addHistory(record) }
         }
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
@@ -66,6 +94,12 @@ enum DebugSnapshot {
                               to: out.appending(path: "gercek-detaylar-\(name).png"))
             }
             await capture(UsageProfileView(model: model), size: nil, to: out.appending(path: "gercek-profil.png"))
+            await capture(SystemDataView(model: model), size: nil, to: out.appending(path: "gercek-sistem-verileri.png"))
+            await capture(HistoryView(model: model), size: NSSize(width: 620, height: 420),
+                          to: out.appending(path: "gercek-gecmis.png"))
+            model.detailsCategory = .docker
+            await capture(DetailsView(model: model), size: NSSize(width: 900, height: 600),
+                          to: out.appending(path: "gercek-detaylar-docker.png"), settle: .milliseconds(2500))
             // En dar pencere: temizlik çubuğundaki düğmeler sığıyor mu?
             model.detailsCategory = .duplicates
             await capture(DetailsView(model: model), size: NSSize(width: 800, height: 480),

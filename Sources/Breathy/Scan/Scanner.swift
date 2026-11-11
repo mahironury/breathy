@@ -19,6 +19,9 @@ struct ScanLimits: Sendable {
     var duplicateMinBytes: Int64 = 1_000_000
     /// "Ne büyüdü?" karşılaştırması için saklanan en küçük klasör (kayıt dosyası küçük kalsın).
     var folderSizeMinBytes: Int64 = 50_000_000
+    /// Uygulama bu kadar gün içinde önbelleğine yazdıysa önbellek "kullanılıyor" sayılır ve otomatik
+    /// işaretlenmez: silinirse hemen yeniden oluşur, yer kısa sürede yine dolar.
+    var cacheFreshDays: Double = 14
 }
 
 /// Taramanın dış dünyaya bağımlılıkları (testlerde sahteleri verilir).
@@ -120,6 +123,29 @@ struct Scanner: Sendable {
             total += Int64(cv.totalFileAllocatedSize ?? cv.fileAllocatedSize ?? 0)
         }
         return total
+    }
+
+    /// Boyut ve içindeki en yeni dosyanın tarihi (önbellek gerçekten kullanılıyor mu?).
+    func measureWithNewest(_ url: URL, _ ctx: ScanContext) throws -> (bytes: Int64, newest: Date?) {
+        let keys: [URLResourceKey] = Self.sizeKeys + [.contentModificationDateKey]
+        let keySet = Set(keys)
+        guard let v = try? url.resourceValues(forKeys: keySet), v.isSymbolicLink != true else { return (0, nil) }
+        guard v.isDirectory == true else {
+            return (Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0), v.contentModificationDate)
+        }
+        guard let e = FileManager.default.enumerator(
+            at: url, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true }
+        ) else { return (0, nil) }
+        var total: Int64 = 0
+        var newest: Date?
+        while let child = e.nextObject() as? URL {
+            try ctx.visit(child)
+            guard let cv = try? child.resourceValues(forKeys: keySet),
+                  cv.isDirectory != true, cv.isSymbolicLink != true else { continue }
+            total += Int64(cv.totalFileAllocatedSize ?? cv.fileAllocatedSize ?? 0)
+            if let date = cv.contentModificationDate, date > (newest ?? .distantPast) { newest = date }
+        }
+        return (total, newest)
     }
 
     /// Mantıksal boyut (iCloud'da kapladığı) ve Mac'te ayrılan alan birlikte.

@@ -16,6 +16,9 @@ struct ScanSection: View {
                     .padding(.horizontal, 4)
                 if let result = model.lastScan {
                     ScanSummaryView(result: result) { model.openDetails($0) }
+                    Button("Sistem Verileri neden bu kadar büyük?") { model.showSystemData() }
+                        .buttonStyle(.link)
+                        .font(.caption)
                     QuickCleanSection(model: model)
                     Button { model.openDetails(nil) } label: {
                         PanelRow(icon: "list.bullet.rectangle", title: "Detaylar ve temizlik…",

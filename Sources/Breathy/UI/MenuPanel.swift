@@ -100,6 +100,12 @@ struct MenuPanel: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .help("Güncellemeleri denetle")
+            Button { model.showHistory() } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Temizlik geçmişi")
             loginToggle
             Spacer()
             Button("Çık") { NSApplication.shared.terminate(nil) }

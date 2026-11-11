@@ -32,7 +32,13 @@ extension Scanner {
                 let bytes = try measure(child, ctx)
                 ctx.addSize("\(root.path)/\(name)", bytes)
 
-                if root.leftoverCandidate, Self.looksLikeBundleID(name), !isInstalled(lower, installed) {
+                let isLeftover = root.leftoverCandidate && Self.looksLikeBundleID(name) && !isInstalled(lower, installed)
+                // Çökme dökümleri (Crashpad): uygulama kalıyorsa ayrıca önerilir; artıksa klasörün tamamı zaten öneride.
+                if !isLeftover, root.path == "Library/Application Support",
+                   let dumps = try crashDumps(in: child, appFolder: name, ctx) {
+                    out.append(dumps)
+                }
+                if isLeftover {
                     if bytes >= limits.minItemBytes,
                        let f = makeFinding(child, .appLeftovers, .review, bytes: bytes,
                                            note: "Kurulu bir uygulamaya ait görünmüyor", ctx: ctx) {
@@ -74,6 +80,18 @@ extension Scanner {
             }
         }
         return out
+    }
+
+    /// Electron/Chromium tabanlı uygulamaların biriktirdiği çökme dökümleri (`<uygulama>/Crashpad`).
+    /// Bazı yapay zekâ masaüstü uygulamaları bunları sürekli üretir; güvenle silinir.
+    func crashDumps(in appFolder: URL, appFolder name: String, _ ctx: ScanContext) throws -> Finding? {
+        let crashpad = appFolder.appending(path: "Crashpad", directoryHint: .isDirectory)
+        guard FileManager.default.fileExists(atPath: crashpad.path) else { return nil }
+        let bytes = try measure(crashpad, ctx)
+        guard bytes >= limits.minItemBytes else { return nil }
+        let app = Growth.appName(forFolder: name)
+        return makeFinding(crashpad, .logs, .safe, bytes: bytes,
+                           note: "\(app) çökme dökümleri — güvenle silinir", ctx: ctx)
     }
 
     // MARK: - Yardımcılar

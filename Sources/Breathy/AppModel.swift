@@ -45,6 +45,12 @@ final class AppModel {
     private(set) var areas = UsageProfile.load()
     /// Başka yerlerde kalmış eski Breathy kopyaları.
     private(set) var oldCopies: [OldCopy] = []
+    /// Temizlik geçmişi (en yeni başta).
+    private(set) var history: [CleanRecord] = CleanHistory.load()
+    /// Docker kullanımı (Detaylar'daki Docker kartı açılınca sorulur).
+    private(set) var docker: DockerState = .unknown
+    /// Yerel Time Machine yedekleri (Sistem Verileri penceresi açılınca sorulur).
+    private(set) var localSnapshots: [Date] = []
     /// false: aynı kopyanın başka bir süreci kapanıyor mu diye bekleniyor; simge boş, panel "başlıyor".
     /// Sadece görünümler okur. Sahne seviyesinde (App.body) değişken durum kullanılmaz: 0.2.2'de
     /// MenuBarExtra'nın isInserted'ını buna bağlamak, panel açılınca sonsuz sahne güncellemesine yol açtı.
@@ -140,14 +146,73 @@ final class AppModel {
         SingleInstance.terminate(running.map(\.processIdentifier))
         Task {
             if !running.isEmpty { try? await Task.sleep(for: .seconds(1)) }
+            let url = URL(fileURLWithPath: copy.path)
+            let bytes = FileSize.allocated(url)
             do {
-                try FileManager.default.trashItem(at: URL(fileURLWithPath: copy.path), resultingItemURL: nil)
+                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                addHistory(CleanRecord(date: Date(), kind: .oldCopy, freedBytes: 0, trashedBytes: bytes,
+                                       items: [.init(path: copy.path, bytes: bytes, trashed: true, category: nil)],
+                                       itemCount: 1))
                 show("✓ Eski Breathy (\(copy.version)) Çöp'e taşındı.")
             } catch {
                 show("Eski kopya taşınamadı. Finder'da kendin Çöp'e atabilirsin.")
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: copy.path)])
             }
             oldCopies = OldCopies.find()
+        }
+    }
+
+    // MARK: - Temizlik geçmişi
+
+    func addHistory(_ record: CleanRecord) {
+        if persistsResults {
+            history = CleanHistory.append(record, to: history)
+        } else {
+            history.insert(record, at: 0)
+        }
+    }
+
+    func showHistory() {
+        HistoryWindowController.shared.show(model: self)
+    }
+
+    // MARK: - Sistem Verileri
+
+    var systemDataRows: [SystemDataRow] {
+        SystemData.rows(scan: lastScan, swapBytes: swap?.fileBytes, purgeableBytes: disk?.purgeable,
+                        localSnapshots: localSnapshots)
+    }
+
+    func showSystemData() {
+        refreshDisk()
+        SystemDataWindowController.shared.show(model: self)
+        Task { localSnapshots = await SystemData.localSnapshots() }
+    }
+
+    // MARK: - Docker
+
+    func refreshDocker() {
+        guard docker != .cleaning else { return }
+        Task { docker = await Docker.usage() }
+    }
+
+    /// Kullanılmayan imajlar ve derleme önbelleği. Container'lara ve volume'lara dokunulmaz.
+    func cleanDocker() {
+        guard case .ready(let before) = docker else { return }
+        docker = .cleaning
+        Task {
+            let ok = await Docker.pruneUnused()
+            let after = await Docker.usage()
+            docker = after
+            let afterCleanable: Int64 = if case .ready(let usage) = after { usage.cleanable } else { 0 }
+            let freed = max(before.cleanable - afterCleanable, 0)
+            if ok {
+                addHistory(CleanRecord(date: Date(), kind: .docker, freedBytes: freed, trashedBytes: 0,
+                                       items: [], itemCount: 0))
+                celebrate(freed, detail: "Docker'da kullanılmayan imajlar silindi. Docker Desktop yeri birkaç dakika içinde diske geri verir.")
+            } else {
+                show("Docker temizliği tamamlanamadı. Docker Desktop açık mı?")
+            }
         }
     }
 
@@ -249,6 +314,7 @@ final class AppModel {
     func emptyTrash() {
         guard case .ready(let summary) = trash, !summary.isEmpty, !isEmptyingTrash else { return }
         isEmptyingTrash = true
+        let itemCount = summary.items + summary.iCloudItems
 
         let service = trashService
         Task {
@@ -258,6 +324,8 @@ final class AppModel {
             isEmptyingTrash = false
 
             if let result {
+                addHistory(CleanRecord(date: Date(), kind: .trash, freedBytes: result.freedDiskBytes,
+                                       trashedBytes: 0, items: [], itemCount: itemCount))
                 var details: [String] = []
                 if result.freedICloudBytes > 0 {
                     details.append("iCloud çöpünden \(ByteFormat.string(result.freedICloudBytes)) silindi")
@@ -494,16 +562,16 @@ extension AppModel {
     }
 
     func cleanSafe() {
-        clean(safeCleanable)
+        clean(safeCleanable, kind: .quickClean)
     }
 
     /// Seçilenleri türüne göre temizler (🟢 sil, 🟡 Çöp'e taşı). Arka planda, iptal edilebilir.
     /// Kategori verilirse sadece o kategorideki seçilenler; diğer kategorilerdeki seçim olduğu gibi kalır.
     func cleanSelected(in category: ScanCategory? = nil) {
-        clean(selectedFindings(in: category))
+        clean(selectedFindings(in: category), kind: .selection)
     }
 
-    private func clean(_ selected: [Finding]) {
+    private func clean(_ selected: [Finding], kind: CleanRecord.Kind) {
         guard cleanWork == nil, !isScanning, let scan = lastScan, !selected.isEmpty else { return }
 
         let cleaner = Cleaner(
@@ -535,6 +603,9 @@ extension AppModel {
             cleanWork = nil
             cleanProgress = nil
             lastCleanReport = report
+            if !report.cleanedPaths.isEmpty {
+                addHistory(CleanHistory.record(from: report, kind: kind, findings: all))
+            }
             removeCleaned(report.cleanedPaths)
 
             let trashedNote = report.trashedBytes > 0

@@ -65,6 +65,9 @@ struct FindingList: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if category == .docker {
+                DockerCard(model: model)
+            }
             HStack {
                 if selectable {
                     Button("Tümünü seç") { model.setSelection(true, in: category) }
@@ -99,6 +102,8 @@ struct FindingList: View {
         case .largeFiles: text += " 6 aydır açılmayanlar işaretlendi."
         case .screenCaptures: text += " 30 günden eskiler işaretlendi."
         case .nodeModules, .buildOutputs, .pythonEnvs: text += " Sadece 90 gündür dokunulmamış projeler."
+        case .docker:
+            text = "Docker'ın disk görüntüsü. Aşağıdaki karttan hiçbir container'ın kullanmadığı imajları ve derleme önbelleğini temizleyebilirsin; container'lara ve volume'lara (veritabanı gibi veriler) dokunulmaz."
         case .games:
             text = "Oyunların önbellekleri yeniden oluşur ve doğrudan silinir. Kurulu oyunlar sadece bilgi: gerekmiyorsa Steam'den kaldır. Kayıtlı oyunlarına dokunulmaz."
         case .devTools:

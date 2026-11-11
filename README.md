@@ -25,6 +25,9 @@ Breathy bunların hepsine bakar ve sana anlaşılır bir liste sunar: neyin ne k
 - **Akıllı tarama:** Bir dakika içinde bütün ev klasörünü tarar ve bulduklarını gruplara ayırır.
 - **Güvenli temizlik:** Kendiliğinden yeniden oluşan dosyaları (önbellekler, loglar) siler. Senin dosyalarını ise sadece Çöp'e taşır, istersen geri alabilirsin.
 - **Ne büyüdü?:** Son taramadan beri en çok büyüyen klasörleri gösterir. Örneğin "WhatsApp +2,4 GB".
+- **"Sistem Verileri" ne?:** Depolama ayarlarında açıklamasız duran o büyük kalemi parçalarına ayırır: uygulama verileri, önbellekler, takas dosyası, Docker, iPhone yedekleri ve macOS'un gerektiğinde kendisinin sileceği alan.
+- **Kullandığın önbelleğe dokunmaz:** Sadece uzun süredir kullanılmayan önbellekleri önerir. Silinince hemen yeniden oluşacak olanları ve ses eklentisi taramaları gibi yeniden kurulması uzun sürenleri işaretlemez.
+- **Temizlik geçmişi:** Neyin ne zaman silindiğini, ne kadar yer açıldığını ve neyin Çöp'e gittiğini kaydeder.
 - **iCloud'u anlar:** iCloud'unu neyin doldurduğunu ve ekran görüntülerinin nereye kaydedildiğini gösterir.
 - **Zamanında haber verir:** Boş yer 10 GB'ın altına inince bir kez uyarır.
 - **Kendini günceller:** Yeni sürüm çıkınca panelde **Güncelle** düğmesi belirir.
@@ -40,7 +43,7 @@ Breathy bunların hepsine bakar ve sana anlaşılır bir liste sunar: neyin ne k
 | Alan | Breathy neye bakar |
 |---|---|
 | Herkes için (her zaman) | Uygulama önbellekleri ve loglar, eski kurulum dosyaları, unutulmuş büyük dosyalar, aynı dosyanın kopyaları, eski ekran görüntüleri, kaldırılmış uygulamaların artıkları, büyük gizli klasörler |
-| Yazılım geliştirme | Aylardır dokunulmamış projelerin indirilmiş paketleri ve derleme çıktıları, paket önbellekleri, Xcode ve simülatör artıkları, Docker |
+| Yazılım geliştirme | Aylardır dokunulmamış projelerin indirilmiş paketleri ve derleme çıktıları, paket önbellekleri, Xcode ve simülatör artıkları. Docker'da hiçbir container'ın kullanmadığı imajları tek tıkla temizler; container'lara ve verilere dokunmaz. |
 | Yapay zekâ kodlama araçları | Antigravity, Cursor ve VS Code'un önbellekleri ve eski ekran kayıtları. Sohbet geçmişine ve planlara dokunulmaz. |
 | Fotoğraf, video ve tasarım | Lightroom önizlemeleri, Final Cut Pro render dosyaları, Adobe ve DaVinci önbellekleri |
 | Oyun | Steam önbellekleri ve kurulu oyunların kapladığı yer. Oyun kayıtlarına dokunulmaz. |
