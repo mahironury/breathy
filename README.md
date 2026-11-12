@@ -65,6 +65,7 @@ Breathy bunların hepsine bakar ve sana anlaşılır bir liste sunar: neyin ne k
 
 - **Sen onaylamadan hiçbir şey silinmez.** Otomatik ya da zamanlanmış silme yoktur.
 - **Senin dosyaların Çöp'e gider.** Belgeler, fotoğraflar, videolar asla doğrudan silinmez.
+- **Önemli dosyalar korunur:** Şifre kasaları, gizli anahtarlar, kurtarma kodları ve benzeri hassas dosyalar kırmızı **kritik** etiketiyle gösterilir. Breathy onları hiçbir zaman seçmez ve silmez. Bunları tanımak için yapılan bütün kontroller Mac'in içinde yapılır, hiçbir şey internete gönderilmez.
 - **Önemli yerlere dokunmaz:** Fotoğraflar arşivi, Mail, Mesajlar, iCloud Drive, şifreler ve uygulamaların sohbet geçmişleri korunur.
 - **Açık uygulamalara saygı duyar:** Çalışan bir uygulamanın verisi silinmez. Önce kapatman istenir.
 - **Her kopyadan biri kalır:** Aynı dosyanın kopyalarından en az biri her zaman korunur.

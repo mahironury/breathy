@@ -94,6 +94,18 @@ struct ScanSummaryView: View {
                 Text("temizlenebilir").foregroundStyle(.secondary)
             }
 
+            let critical = result.criticalFindings
+            if let first = critical.first {
+                Button { openDetails(first.category) } label: {
+                    Label("\(critical.count) kritik dosya korunuyor — Breathy bunlara dokunmaz", systemImage: "lock.shield")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .buttonStyle(.plain)
+                .help("Kripto cüzdanı, şifre, anahtar ya da kurtarma kodu içerenler. Detaylarda göster.")
+            }
+
             if let since = result.growthSince {
                 GrowthList(items: result.growth ?? [], since: since)
             }

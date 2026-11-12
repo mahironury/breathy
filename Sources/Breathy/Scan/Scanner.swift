@@ -22,6 +22,12 @@ struct ScanLimits: Sendable {
     /// Uygulama bu kadar gün içinde önbelleğine yazdıysa önbellek "kullanılıyor" sayılır ve otomatik
     /// işaretlenmez: silinirse hemen yeniden oluşur, yer kısa sürede yine dolar.
     var cacheFreshDays: Double = 14
+    /// Kaldırılmış uygulama artığı bu kadar gün içinde değiştiyse otomatik işaretlenmez:
+    /// uygulama başka bir yerde kurulu ve kullanılıyor olabilir.
+    var leftoverQuietDays: Double = 90
+    /// Kritik dosya denetiminde içerik okumaya (metin, PDF, ekran görüntüsündeki yazı) ayrılan süre.
+    /// Yetişmeyenler silmeden hemen önce okunur.
+    var criticalContentSeconds: Double = 20
 }
 
 /// Taramanın dış dünyaya bağımlılıkları (testlerde sahteleri verilir).
@@ -86,6 +92,9 @@ struct Scanner: Sendable {
             screenshots: findings.filter { $0.category == .screenCaptures }, ctx
         )
         findings += archives
+
+        try ctx.phase("Kritik dosyalar denetleniyor")
+        findings = try markCritical(findings, ctx)
 
         ctx.finish()
         findings.sort { $0.bytes > $1.bytes }
@@ -190,6 +199,25 @@ struct Scanner: Sendable {
         )
         if finding.countsAsCleanable { ctx.found(bytes) }
         return finding
+    }
+
+    /// Şifre, anahtar ve kurtarma kodu gibi kritik verileri işaretler: otomatik seçilmez,
+    /// seçilemez, Breathy silmez. Aynı içerikteki kopyalardan biri kritikse hepsi kritiktir.
+    func markCritical(_ findings: [Finding], _ ctx: ScanContext) throws -> [Finding] {
+        let budget = CriticalContent.Budget(seconds: limits.criticalContentSeconds)
+        var out = findings
+        for index in out.indices where out[index].risk != .info {  // bilgi satırlarını Breathy zaten silmez
+            try ctx.checkpoint(out[index].url)
+            if let kind = CriticalData.check(out[index], home: env.home.path, budget: budget) {
+                out[index].markCritical(kind.reason)
+            }
+        }
+        var groupReasons: [String: String] = [:]
+        for finding in out { if let group = finding.groupID, let reason = finding.critical { groupReasons[group] = reason } }
+        for index in out.indices where out[index].critical == nil {
+            if let group = out[index].groupID, let reason = groupReasons[group] { out[index].markCritical(reason) }
+        }
+        return out
     }
 
     func daysSince(_ date: Date) -> Double {

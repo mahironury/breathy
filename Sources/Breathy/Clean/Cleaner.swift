@@ -31,7 +31,7 @@ struct CleanProgress: Sendable, Equatable {
 ///   🟢 safe   → doğrudan silinir (kendiliğinden yeniden oluşur)
 ///   🟡 review → Çöp'e taşınır (geri alınabilir)
 ///   🔴 info   → asla
-/// Her öğe silinmeden hemen önce yeniden denetlenir (PathGuard, açık uygulama, çift grubunda kalan kopya).
+/// Her öğe silinmeden hemen önce yeniden denetlenir (PathGuard, kritik veri, açık uygulama, çift grubunda kalan kopya).
 struct Cleaner: Sendable {
     let home: URL
     let appDirs: [URL]
@@ -100,6 +100,10 @@ struct Cleaner: Sendable {
         if finding.risk == .info { return "Sadece bilgi; Breathy bunu silmez" }
         guard (try? fm.attributesOfItem(atPath: finding.path)) != nil else { return "Zaten yok" }
         guard PathGuard.canDelete(finding.url, home: home, appDirs: appDirs) else { return "Korunan konum" }
+        // Kritik veri: taramada işaretlenmiş olsun olmasın (eski sonuçlar, süreye sığmayan içerik) yeniden bakılır.
+        if let reason = finding.critical ?? CriticalData.check(finding, home: home.path, budget: nil)?.reason {
+            return "Kritik — \(reason). Breathy bunu silmez"
+        }
         if let owner = currentOwner(of: finding) { return "\(owner) açık — önce kapat" }
         if let groupID = finding.groupID {
             let survivors = (groups[groupID] ?? []).filter {

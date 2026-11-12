@@ -29,19 +29,30 @@ extension Scanner {
                 if rulePaths.contains(where: { $0.hasPrefix(childPath + "/") }) { continue }
 
                 ctx.setFolder(child)
-                let bytes = try measure(child, ctx)
+                let isLeftover = root.leftoverCandidate && Self.looksLikeBundleID(name) && !isInstalled(lower, installed)
+                // Artıkta içindeki en yeni dosyanın tarihine de bakılır: yakın zamanda değiştiyse uygulama
+                // aslında başka bir yerde kurulu olabilir (İndirilenler, harici disk…).
+                let measured: (bytes: Int64, newest: Date?) = isLeftover
+                    ? try measureWithNewest(child, ctx) : (try measure(child, ctx), nil)
+                let bytes = measured.bytes
                 ctx.addSize("\(root.path)/\(name)", bytes)
 
-                let isLeftover = root.leftoverCandidate && Self.looksLikeBundleID(name) && !isInstalled(lower, installed)
                 // Çökme dökümleri (Crashpad): uygulama kalıyorsa ayrıca önerilir; artıksa klasörün tamamı zaten öneride.
                 if !isLeftover, root.path == "Library/Application Support",
                    let dumps = try crashDumps(in: child, appFolder: name, ctx) {
                     out.append(dumps)
                 }
                 if isLeftover {
+                    var note = "Kurulu bir uygulamaya ait görünmüyor"
+                    var recent = false
+                    if let newest = measured.newest, daysSince(newest) < limits.leftoverQuietDays {
+                        recent = true
+                        let days = Int(daysSince(newest))
+                        note += " ama \(days == 0 ? "bugün" : "\(days) gün önce") kullanılmış — uygulama başka bir yerde kurulu olabilir"
+                    }
                     if bytes >= limits.minItemBytes,
-                       let f = makeFinding(child, .appLeftovers, .review, bytes: bytes,
-                                           note: "Kurulu bir uygulamaya ait görünmüyor", ctx: ctx) {
+                       let f = makeFinding(child, .appLeftovers, .review, bytes: bytes, suggested: !recent,
+                                           lastUsed: measured.newest, note: note, ctx: ctx) {
                         out.append(f)
                     }
                 } else if bytes >= limits.appDataBytes,

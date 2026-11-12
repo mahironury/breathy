@@ -37,6 +37,13 @@ enum DebugSnapshot {
                 scan.findings.append(Finding(path: home + "/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
                                              category: .docker, risk: .info, bytes: 3_060_000_000, suggested: false,
                                              note: "Docker'ın disk görüntüsü — yukarıdaki karttan kullanılmayan imajları temizleyebilirsin"))
+                var shot = Finding(path: home + "/Desktop/Ekran Resmi 2026-03-02 21.14.08.png", category: .screenCaptures,
+                                   risk: .review, bytes: 2_400_000, suggested: false)
+                shot.markCritical(CriticalData.Kind.cryptoContent.reason)
+                var leftover = Finding(path: home + "/Library/Application Support/com.ledger.live", category: .appLeftovers,
+                                       risk: .review, bytes: 310_000_000, suggested: false, note: "Kurulu bir uygulamaya ait görünmüyor")
+                leftover.markCritical(CriticalData.Kind.cryptoWallet.reason)
+                scan.findings += [shot, leftover]
                 let day: TimeInterval = 86_400
                 for record in [
                     CleanRecord(date: Date().addingTimeInterval(-9 * day), kind: .selection, freedBytes: 14_400_000_000,
@@ -88,7 +95,8 @@ enum DebugSnapshot {
             model.celebrate(2_340_000_000, detail: "Çöp boşaltıldı")
             await capture(MenuPanel(model: model), size: nil, to: out.appending(path: "gercek-panel-acildi-koyu.png"),
                           settle: .milliseconds(1800), dark: true)
-            for (category, name) in [(ScanCategory.caches, "onbellek"), (.duplicates, "cift"), (.largeFiles, "buyuk")] {
+            for (category, name) in [(ScanCategory.caches, "onbellek"), (.duplicates, "cift"), (.largeFiles, "buyuk"),
+                                     (.screenCaptures, "ekran"), (.appLeftovers, "artik")] {
                 model.detailsCategory = category
                 await capture(DetailsView(model: model), size: NSSize(width: 900, height: 600),
                               to: out.appending(path: "gercek-detaylar-\(name).png"))

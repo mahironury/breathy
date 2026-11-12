@@ -113,6 +113,10 @@ struct FindingList: View {
         case .unusedApps: text += " 6 aydır açılmamış uygulamalar."
         default: break
         }
+        let critical = items.filter { $0.critical != nil }.count
+        if critical > 0 {
+            text += " 🔒 \(critical) öğe kritik (kripto cüzdanı, şifre, anahtar ya da kurtarma kodu): Breathy bunları seçmez ve silmez. Gerçekten gereksizse Finder'dan kendin silebilirsin."
+        }
         return text
     }
 
@@ -188,7 +192,13 @@ private struct FindingRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if let owner = finding.inUseBy {
+                if let critical = finding.critical {
+                    Label("\(critical) — Breathy silmez", systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let owner = finding.inUseBy {
                     Text("\(owner) açık — kapatıp yeniden tara")
                         .font(.caption)
                         .foregroundStyle(.orange)
@@ -233,6 +243,15 @@ private struct FindingRow: View {
 
     @ViewBuilder
     private var badge: some View {
+        if finding.critical != nil {
+            tag("kritik", .red)
+        } else {
+            riskBadge
+        }
+    }
+
+    @ViewBuilder
+    private var riskBadge: some View {
         switch finding.risk {
         case .safe: tag("silinir", .green)
         case .review: tag(finding.groupID != nil && !finding.suggested ? "korunacak" : "Çöp'e", .orange)

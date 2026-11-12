@@ -503,9 +503,9 @@ final class AppModel {
 // MARK: - Seçim ve temizlik
 
 extension AppModel {
-    /// Açık bir uygulamaya ait olmayan, bilgi olmayan bulgular seçilebilir.
+    /// Açık bir uygulamaya ait olmayan, bilgi olmayan, kritik olmayan bulgular seçilebilir.
     nonisolated static func isSelectable(_ finding: Finding) -> Bool {
-        finding.risk != .info && finding.inUseBy == nil
+        finding.risk != .info && finding.inUseBy == nil && finding.critical == nil
     }
 
     func findings(in category: ScanCategory) -> [Finding] {

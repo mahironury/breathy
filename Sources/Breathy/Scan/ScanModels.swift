@@ -101,12 +101,19 @@ struct Finding: Codable, Sendable, Hashable, Identifiable {
     var inUseBy: String?
     /// Çift dosyalarda aynı içerikteki kopyaları bağlar.
     var groupID: String?
+    /// Doluysa kritik veri (şifre, anahtar, kurtarma kodu…) ve nedeni: Breathy silmez.
+    var critical: String? = nil
 
     var id: String { path }
     var url: URL { URL(fileURLWithPath: path) }
     var name: String { url.lastPathComponent }
-    /// Toplama dahil edilir mi: önerilmiş, bilgi değil, açık bir uygulamaya ait değil.
-    var countsAsCleanable: Bool { suggested && risk != .info && inUseBy == nil }
+    /// Toplama dahil edilir mi: önerilmiş, bilgi değil, açık bir uygulamaya ait değil, kritik değil.
+    var countsAsCleanable: Bool { suggested && risk != .info && inUseBy == nil && critical == nil }
+
+    mutating func markCritical(_ reason: String) {
+        critical = reason
+        suggested = false
+    }
 }
 
 struct CategorySummary: Sendable, Identifiable {
@@ -174,6 +181,9 @@ struct ScanResult: Codable, Sendable {
     var cleanableBytes: Int64 {
         findings.reduce(0) { $0 + ($1.countsAsCleanable ? $1.bytes : 0) }
     }
+
+    /// Kritik diye korunan bulgular.
+    var criticalFindings: [Finding] { findings.filter { $0.critical != nil } }
 
     /// Kategorilere göre özet, büyükten küçüğe.
     func summaries() -> [CategorySummary] {
