@@ -83,6 +83,10 @@ enum DebugSnapshot {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
             await capture(MenuPanel(model: model), size: nil, to: out.appending(path: "gercek-panel.png"))
+            // Küçük ekran: panel sığmaz, orta bölüm kaydırılır, alttaki satır (Çık) görünür kalır.
+            MenuPanel.previewScreenHeight = 560
+            await capture(MenuPanel(model: model), size: nil, to: out.appending(path: "gercek-panel-kucuk-ekran.png"))
+            MenuPanel.previewScreenHeight = nil
             // Menü çubuğu etiketi, açık ve koyu menü çubuğu üstünde.
             for (dark, name) in [(false, "menu-cubugu"), (true, "menu-cubugu-koyu")] {
                 await capture(MenuBarLabel(model: model).padding(.horizontal, 10).padding(.vertical, 4),
@@ -129,6 +133,11 @@ enum DebugSnapshot {
         window.contentView = hosting
         window.orderFrontRegardless()  // ekran dışında
         try? await Task.sleep(for: settle)  // listeler satırlarını yerleştirsin, animasyonlar bitsin
+        if size == nil {
+            // Panel yüksekliğini ilk yerleşimden sonra ölçer (kaydırılan bölüm): yeniden boyutlandır.
+            window.setContentSize(hosting.fittingSize)
+            try? await Task.sleep(for: .milliseconds(300))
+        }
         hosting.layoutSubtreeIfNeeded()
         // Ekran 1x olsa da 2x çiz (README görselleri Retina ekranlarda net görünsün).
         let bounds = hosting.bounds

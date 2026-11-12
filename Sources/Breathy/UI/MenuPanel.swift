@@ -3,6 +3,11 @@ import SwiftUI
 /// Menü çubuğu simgesine basınca açılan panel.
 struct MenuPanel: View {
     let model: AppModel
+    /// Kaydırılan bölümün içeriğinin gerçek yüksekliği ve alttaki sabit satırın yüksekliği.
+    @State private var scrollContentHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 44
+    /// Önizlemede küçük ekranı taklit etmek için (geliştirme aracı). Normalde nil.
+    static var previewScreenHeight: CGFloat?
 
     var body: some View {
         if model.isPrimaryInstance {
@@ -14,7 +19,45 @@ struct MenuPanel: View {
         }
     }
 
+    /// Panel ekrana sığmazsa (küçük ekran, uzun tarama sonucu) orta bölüm kaydırılır;
+    /// alttaki sürüm, geçmiş ve Çık satırı her zaman görünür kalır.
     private var content: some View {
+        VStack(spacing: 0) {
+            ScrollView(.vertical) {
+                scrollingContent
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollContentHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(scrollContentHeight, maxScrollHeight))
+
+            VStack(alignment: .leading, spacing: 10) {
+                // Güncelleme de hep görünür: küçük ekranda panelin altında kalıp bulunamasın.
+                if let update = model.update {
+                    UpdateRow(version: update.version, isUpdating: model.isUpdating,
+                              install: { model.installUpdate() },
+                              showNotes: { NSWorkspace.shared.open(update.pageURL) })
+                }
+                Divider()
+                footer
+            }
+            .padding([.horizontal, .bottom], 16)
+            .padding(.top, 2)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
+        }
+        .frame(width: 320)
+        .animation(.easeInOut(duration: 0.2), value: model.flash)
+        .animation(.spring(duration: 0.45, bounce: 0.3), value: model.celebration)
+        .onAppear { model.panelOpened() }
+    }
+
+    /// Kaydırılan bölümün en fazla yüksekliği: ekranın kullanılabilir yüksekliğinden (menü çubuğu
+    /// ve Dock hariç) alttaki satır ve küçük bir pay çıkar.
+    private var maxScrollHeight: CGFloat {
+        let screen = Self.previewScreenHeight ?? NSScreen.main?.visibleFrame.height ?? 800
+        return max(200, screen - footerHeight - 16)
+    }
+
+    private var scrollingContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
@@ -61,20 +104,9 @@ struct MenuPanel: View {
                 OldCopyRow(copy: copy) { model.trashOldCopy(copy) }
             }
 
-            if let update = model.update {
-                UpdateRow(version: update.version, isUpdating: model.isUpdating,
-                          install: { model.installUpdate() },
-                          showNotes: { NSWorkspace.shared.open(update.pageURL) })
-            }
-
-            Divider()
-            footer
         }
-        .padding(16)
-        .frame(width: 320)
-        .animation(.easeInOut(duration: 0.2), value: model.flash)
-        .animation(.spring(duration: 0.45, bounce: 0.3), value: model.celebration)
-        .onAppear { model.panelOpened() }
+        .padding([.horizontal, .top], 16)
+        .padding(.bottom, 12)
     }
 
     private var header: some View {

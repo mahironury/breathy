@@ -109,33 +109,57 @@ enum UISmokeTest {
         return result == KERN_SUCCESS ? Double(info.resident_size) / 1_000_000 : -1
     }
 
-    /// Menü çubuğundaki kendi düğmemiz (MenuBarExtra'nın durum çubuğu penceresindeki NSStatusBarButton).
-    static func statusButton() -> NSButton? {
-        func find(_ view: NSView) -> NSButton? {
-            if let button = view as? NSButton, String(describing: type(of: button)).contains("StatusBar") { return button }
-            for sub in view.subviews { if let found = find(sub) { return found } }
-            return nil
+    /// Küçük ekranı taklit eden yükseklik: panel buna sığmalı, orta bölüm kaydırılmalı.
+    static let smallScreenHeight: CGFloat = 520
+
+    @MainActor final class MenuBox { var menu: NSMenu? }
+
+    /// Simgeye sağ tıklanmış gibi bir olay gönderir, açılan menünün başlıklarını okur ve menüyü kapatır.
+    static func rightClickMenuTitles() async -> [String] {
+        guard let window = NSApp.windows.first(where: StatusItemMenu.isStatusItemWindow),
+              let event = NSEvent.mouseEvent(
+                with: .rightMouseDown, location: NSPoint(x: window.frame.width / 2, y: window.frame.height / 2),
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+        else { return [] }
+        let box = MenuBox()
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
+        ) { note in
+            nonisolated(unsafe) let menu = note.object as? NSMenu  // bildirim ana kuyrukta gelir
+            MainActor.assumeIsolated { box.menu = menu }
         }
-        for window in NSApp.windows where String(describing: type(of: window)).contains("StatusBar") {
-            if let content = window.contentView, let button = find(content) { return button }
-        }
-        return nil
+        defer { NotificationCenter.default.removeObserver(observer) }
+        NSApp.postEvent(event, atStart: false)
+        for _ in 0..<30 where box.menu == nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let titles = box.menu?.items.map(\.title) ?? []
+        box.menu?.cancelTracking()
+        try? await Task.sleep(for: .milliseconds(300))
+        return titles
     }
 
     static func schedule(model: AppModel, out: URL) {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            let button = statusButton()
+            MenuPanel.previewScreenHeight = smallScreenHeight  // kaydırılan panel yolunu da dener
+            let button = StatusItemMenu.statusButton()
             button?.performClick(nil)  // menü çubuğu panelini aç (kullanıcının tıklaması gibi)
             try? await Task.sleep(for: .seconds(1))
+            let panel = NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("MenuBarExtra") }
             let cpu0 = cpuSeconds(), mem0 = residentMB(), t0 = Date()
             try? await Task.sleep(for: .seconds(5))
+            let cpu = cpuSeconds() - cpu0
+            let titles = await rightClickMenuTitles()
             let report: [String: Double] = [
                 "panelOpened": button == nil ? 0 : 1,
-                "idleCPUSeconds": cpuSeconds() - cpu0,
+                "idleCPUSeconds": cpu,
                 "wallSeconds": Date().timeIntervalSince(t0),
                 "memoryStartMB": mem0,
                 "memoryEndMB": residentMB(),
+                "panelHeight": Double(panel?.frame.height ?? -1),
+                "screenLimit": Double(smallScreenHeight),
+                "contextMenuItems": Double(titles.count),
+                "contextMenuQuit": titles.contains("Breathy'den çık") ? 1 : 0,
             ]
             let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
             try? data?.write(to: out)

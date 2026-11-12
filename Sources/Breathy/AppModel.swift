@@ -105,6 +105,7 @@ final class AppModel {
     /// Sadece gerçek uygulamada çağrılır (testlerde, rapor ve önizleme modlarında değil):
     /// açılışta başlatma ve 10 GB uyarısı.
     func startBackgroundServices() {
+        StatusItemMenu.install(model: self)  // simgeye sağ tık: aç, geçmiş, güncelle, çık
         LoginItem.configureOnFirstLaunch()
         loginItem = LoginItem.state
         let notifier = LowSpaceNotifier()
